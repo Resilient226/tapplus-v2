@@ -82,9 +82,7 @@ module.exports = async function handler(req, res) {
     }
 
     // List all — super admin only
-    const { listAll } = req.query;
-    if (listAll) {
-      const { getSession, requireRole } = require('../lib/utils');
+    if (req.query.listAll) {
       const session = getSession(req);
       const guard   = requireRole(session, 'superAdmin');
       if (guard) return err(res, guard.error, guard.status);
