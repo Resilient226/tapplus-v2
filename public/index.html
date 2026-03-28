@@ -59,6 +59,11 @@ body{
   animation:spin .7s linear infinite;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
+#loading{position:fixed;inset:0;background:var(--black);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;transition:opacity .3s}
+#loading.hidden{opacity:0;pointer-events:none}
+#loading .load-logo{font-size:52px;font-weight:900;letter-spacing:-.04em;margin-bottom:16px}
+#loading .load-logo span{color:var(--green)}
+#loading .load-spinner{width:32px;height:32px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
 </style>
 </head>
 <body>
