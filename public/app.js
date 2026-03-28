@@ -726,9 +726,167 @@ function renderSuperAdminDashboard(){
   window._saT=function(t){
     ['layout','biz'].forEach(x=>{const b=$('sa-'+x);if(b)b.className='tab'+(x===t?' active':'');});
     if(t==='layout')saLayout();
-    else $('sa-body').innerHTML=`<div class="card" style="text-align:center;color:var(--gray);padding:40px">Use Firestore console to manage businesses.</div>`;
+    else saBiz();
   };
   window._saT('layout');
+}
+
+async function saBiz() {
+  var body = $('sa-body');
+  if (!body) return;
+  body.innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></div>';
+
+  // Fetch all businesses — super admin can search by slug
+  // We'll show a search + create interface
+  function draw(businesses) {
+    body.innerHTML = `
+      <button class="btn btn-primary btn-full" style="margin-bottom:16px" onclick="window._saCreateBiz()">
+        + Create New Business
+      </button>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <input class="inp" id="sa-biz-search" placeholder="Search by slug…" style="flex:1"
+          oninput="window._saSearch(this.value)"/>
+      </div>
+      <div id="sa-biz-list">
+        ${businesses.length === 0
+          ? '<div class="card" style="text-align:center;color:var(--gray);padding:30px">No businesses yet.</div>'
+          : businesses.map(b => `
+            <div class="plain-card" style="display:flex;align-items:center;gap:12px">
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700">${esc(b.name)}</div>
+                <div style="font-size:12px;color:var(--gray)">
+                  Code: <span style="color:var(--green);font-weight:700">${esc(b.storeCode)}</span>
+                  · ${esc(b.slug)}
+                </div>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button onclick="window._saViewBiz('${b.id}')" class="btn btn-ghost btn-sm">View</button>
+                <button onclick="window._saDeleteBiz('${b.id}','${esc(b.name)}')" class="btn btn-sm"
+                  style="background:rgba(255,68,85,.1);color:var(--red);border:1px solid rgba(255,68,85,.2)">
+                  Delete
+                </button>
+              </div>
+            </div>`).join('')
+        }
+      </div>`;
+  }
+
+  // Load businesses — we'll use the super admin token to list them
+  // Since we don't have a list-all endpoint, search Firestore via a slug query
+  // For now load a few known businesses by querying with empty slug search
+  var allBiz = [];
+  try {
+    // Try to get all businesses via a wildcard - our API doesn't support list-all yet
+    // So we'll show a search interface
+    draw([]);
+  } catch(e) {
+    draw([]);
+  }
+
+  window._saSearch = async function(q) {
+    if (!q || q.length < 2) return;
+    try {
+      var d = await API.business.getBySlug(q.trim().toLowerCase());
+      if (d.business) {
+        window._saLastFound = d.business;
+        var list = $('sa-biz-list');
+        if (list) {
+          list.innerHTML = '<div class="plain-card" style="display:flex;align-items:center;gap:12px">'
+            + '<div style="flex:1;min-width:0"><div style="font-weight:700">'+esc(d.business.name)+'</div>'
+            + '<div style="font-size:12px;color:var(--gray)">Code: <span style="color:var(--green);font-weight:700">'+esc(d.business.storeCode)+'</span> · '+esc(d.business.slug)+'</div></div>'
+            + '<div style="display:flex;gap:6px">'
+            + '<button class="btn btn-ghost btn-sm" onclick="window._saViewBiz(window._saLastFound.id)">View</button>'
+            + '<button class="btn btn-sm" style="background:rgba(255,68,85,.1);color:var(--red);border:1px solid rgba(255,68,85,.2)" onclick="window._saDeleteBiz(window._saLastFound.id,window._saLastFound.name)">Delete</button>'
+            + '</div></div>';
+        }
+      }
+    } catch(e2) { /* not found */ }
+  };
+
+  window._saViewBiz = async function(id) {
+    showLoading('Loading…');
+    try {
+      var d = await API.business.getById(id);
+      State.biz = d.business;
+      State.session = { ...State.session, bizId: id, role: 'bizAdmin' };
+      await loadDashboardData();
+      renderDashboard();
+    } catch(e) { showToast(e.message || 'Failed'); renderSuperAdminDashboard(); }
+  };
+
+  window._saDeleteBiz = async function(id, name) {
+    if (!confirm('Delete ' + name + '? This cannot be undone. All staff and data will be lost.')) return;
+    showLoading('Deleting…');
+    try {
+      await API.business.delete(id);
+      showToast(name + ' deleted');
+      renderSuperAdminDashboard();
+    } catch(e) { showToast(e.message || 'Delete failed'); renderSuperAdminDashboard(); }
+  };
+
+  window._saCreateBiz = function() {
+    showModal(`
+      <div class="modal-head">
+        <div class="modal-title">Create Business</div>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div><div class="field-lbl">Owner Email</div>
+          <input class="inp" id="sa-cb-email" type="email" placeholder="owner@business.com"/></div>
+        <div><div class="field-lbl">Owner Password</div>
+          <input class="inp" id="sa-cb-pass" type="password" placeholder="Min 6 characters"/></div>
+        <div><div class="field-lbl">Business Name</div>
+          <input class="inp" id="sa-cb-name" placeholder="The James Room"/></div>
+        <div><div class="field-lbl">Admin PIN (4-6 digits)</div>
+          <input class="inp" id="sa-cb-admin" type="number" inputmode="numeric" placeholder="e.g. 1234"/></div>
+        <div><div class="field-lbl">Manager PIN (4-6 digits)</div>
+          <input class="inp" id="sa-cb-mgr" type="number" inputmode="numeric" placeholder="e.g. 5678"/></div>
+        <button class="btn btn-primary btn-full" onclick="window._saDoCreate()">Create Business</button>
+      </div>`);
+
+    window._saDoCreate = async function() {
+      var email    = $('sa-cb-email')?.value?.trim();
+      var pass     = $('sa-cb-pass')?.value;
+      var name     = $('sa-cb-name')?.value?.trim();
+      var adminPin = $('sa-cb-admin')?.value?.trim();
+      var mgrPin   = $('sa-cb-mgr')?.value?.trim();
+
+      if (!email)   { showToast('Enter owner email'); return; }
+      if (!pass || pass.length < 6) { showToast('Password must be 6+ characters'); return; }
+      if (!name)    { showToast('Enter business name'); return; }
+      if (!adminPin || adminPin.length < 4) { showToast('Admin PIN must be 4+ digits'); return; }
+      if (!mgrPin   || mgrPin.length < 4)   { showToast('Manager PIN must be 4+ digits'); return; }
+      if (adminPin === mgrPin) { showToast('PINs must be different'); return; }
+
+      closeModal();
+      showLoading('Creating…');
+
+      try {
+        // Create Firebase Auth account for owner
+        var cred    = await fbAuth.createUserWithEmailAndPassword(email, pass);
+        var idToken = await cred.user.getIdToken();
+
+        // Temporarily set as bearer token
+        sessionStorage.setItem('tp_session', JSON.stringify({ token: idToken }));
+
+        // Create business
+        var d = await API.business.create({ name, adminPin, managerPin: mgrPin });
+
+        // Restore super admin session
+        sessionStorage.setItem('tp_session', JSON.stringify(State.session));
+
+        showToast(name + ' created! Code: ' + d.business.storeCode, 4000);
+        renderSuperAdminDashboard();
+        // Switch to businesses tab
+        setTimeout(() => window._saT('biz'), 500);
+      } catch(e) {
+        // Restore super admin session on error
+        sessionStorage.setItem('tp_session', JSON.stringify(State.session));
+        showToast(e.message || 'Failed to create business');
+        renderSuperAdminDashboard();
+      }
+    };
+  };
 }
 
 // ── Customer Tap Page ─────────────────────────────────────────────────────────
