@@ -23,7 +23,21 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return err(res, 'Method not allowed', 405);
 
   const { type } = req.body || {};
-  if (!type) return err(res, 'Login type required');
+  if (!type) return err(res, 'Login type required');if (type === 'superAdmin') {
+  const { pin } = req.body;
+  if (!pin) return err(res, 'PIN required');
+
+  console.log('SUPER_ADMIN_PIN_HASH exists:', !!SUPER_ADMIN_PIN_HASH);
+  console.log('PIN_SALT exists:', !!process.env.PIN_SALT);
+
+  if (!SUPER_ADMIN_PIN_HASH) return err(res, 'Super admin not configured', 500);
+  if (!verifyPin(pin, SUPER_ADMIN_PIN_HASH)) {
+    return err(res, 'Invalid PIN', 401);
+  }
+
+  const token = signToken({ role: 'superAdmin' });
+  return ok(res, { token, role: 'superAdmin' });
+}
 
   // ── Owner login via Firebase Auth ────────────────────────────────────────
   if (type === 'owner') {
