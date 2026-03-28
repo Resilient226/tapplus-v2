@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#07080c"/>
+<title>Tap+</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#00e5a0;
+  --black:#07080c;
+  --surface:#0e0f15;
+  --surface2:#15171f;
+  --border:rgba(255,255,255,.07);
+  --text:#eef0f8;
+  --muted:rgba(238,240,248,.45);
+  --red:#ff4455;
+  --yellow:#ffd166;
+  --radius:14px;
+}
+html,body{height:100%;overflow:hidden}
+body{
+  background:var(--black);
+  color:var(--text);
+  font-family:'Nunito',sans-serif;
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+#app{
+  height:100%;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+/* Loading screen */
+#loading{
+  position:fixed;inset:0;
+  background:var(--black);
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:16px;
+  z-index:9999;
+  transition:opacity .3s;
+}
+#loading.done{opacity:0;pointer-events:none}
+.load-logo{
+  font-size:36px;font-weight:900;letter-spacing:-.02em;
+}
+.load-logo span{color:var(--green)}
+.load-spinner{
+  width:28px;height:28px;
+  border:2.5px solid rgba(255,255,255,.1);
+  border-top-color:var(--green);
+  border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="load-logo">Tap<span>+</span></div>
+  <div class="load-spinner"></div>
+</div>
+
+<div id="app"></div>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+  import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
+           signOut, onAuthStateChanged }
+    from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+
+  const firebaseConfig = {
+    apiKey:    "AIzaSyD-placeholder-replace-with-real-key",
+    authDomain:"tapplus-a2d09.firebaseapp.com",
+    projectId: "tapplus-a2d09",
+  };
+
+  const fbApp  = initializeApp(firebaseConfig);
+  const fbAuth = getAuth(fbApp);
+
+  // Expose to app.js
+  window._fbAuth = fbAuth;
+  window._fbSignIn   = (email, pw) => signInWithEmailAndPassword(fbAuth, email, pw);
+  window._fbSignUp   = (email, pw) => createUserWithEmailAndPassword(fbAuth, email, pw);
+  window._fbSignOut  = ()          => signOut(fbAuth);
+  window._fbOnAuth   = (cb)        => onAuthStateChanged(fbAuth, cb);
+</script>
+
+<!-- API Client -->
+<script src="/public/api-client.js"></script>
+
+<!-- Main App -->
+<script src="/public/app.js"></script>
+
+</body>
+</html>
