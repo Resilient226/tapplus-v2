@@ -81,6 +81,19 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // List all — super admin only
+    const { listAll } = req.query;
+    if (listAll) {
+      const { getSession, requireRole } = require('../lib/utils');
+      const session = getSession(req);
+      const guard   = requireRole(session, 'superAdmin');
+      if (guard) return err(res, guard.error, guard.status);
+
+      const snap = await db.collection(COL).orderBy('name', 'asc').limit(200).get();
+      const businesses = snap.docs.map(d => sanitize(d.id, d.data()));
+      return ok(res, { businesses });
+    }
+
     return err(res, 'Provide slug, code, or id');
   }
 
