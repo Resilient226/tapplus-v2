@@ -44,26 +44,14 @@ module.exports = async function handler(req, res) {
 
   // ── GET ──────────────────────────────────────────────────────────────────
   if (req.method === 'GET') {
-    const { slug, code, id, listAll } = req.query;
+    const { slug, code, id } = req.query;
 
-    // List all — super admin only
-    if (listAll) {
-      const session = getSession(req);
-      const guard   = requireRole(session, 'superAdmin');
-      if (guard) return err(res, guard.error, guard.status);
-      const snap = await db.collection(COL).orderBy('name', 'asc').limit(200).get();
-      const businesses = snap.docs.map(d => sanitize(d.id, d.data()));
-      return ok(res, { businesses });
-    }
-
-    // Get by Firestore ID
     if (id) {
       const doc = await db.collection(COL).doc(id).get();
       if (!doc.exists) return err(res, 'Business not found', 404);
       return ok(res, { business: sanitize(doc.id, doc.data()) });
     }
 
-    // Get by slug
     if (slug) {
       const snap = await db.collection(COL).where('slug', '==', slug).limit(1).get();
       if (snap.empty) return err(res, 'Business not found', 404);
@@ -71,7 +59,6 @@ module.exports = async function handler(req, res) {
       return ok(res, { business: sanitize(doc.id, doc.data()) });
     }
 
-    // Get by store code
     if (code) {
       const snap = await db.collection(COL).where('storeCode', '==', code).limit(1).get();
       if (snap.empty) return err(res, 'Invalid store code', 404);
@@ -123,16 +110,16 @@ module.exports = async function handler(req, res) {
       mgrPinHash:   hashPin(managerPin),
       branding: {
         name,
-        tagline:       '',
-        logoUrl:       '',
-        brandColor:    '#00e5a0',
-        bgColor:       '#07080c',
-        textColor:     '#ffffff',
-        ratingQuestion:'How was your experience today?',
-        reviewPrompt:  'Glad to hear it! Share your experience:',
-        thankYouMsg:   'Thank you! Your feedback means a lot.',
-        lowRatingMsg:  "We're sorry. Tell us what happened:",
-        bulletinLinks: [],
+        tagline:        '',
+        logoUrl:        '',
+        brandColor:     '#00e5a0',
+        bgColor:        '#07080c',
+        textColor:      '#ffffff',
+        ratingQuestion: 'How was your experience today?',
+        reviewPrompt:   'Glad to hear it! Share your experience:',
+        thankYouMsg:    'Thank you! Your feedback means a lot.',
+        lowRatingMsg:   "We're sorry. Tell us what happened:",
+        bulletinLinks:  [],
         allowedStaffLinks: {
           spotify: true, phone: false, email: false,
           instagram: false, tiktok: false, custom: false,
