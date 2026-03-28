@@ -70,34 +70,10 @@ body{
 
 <div id="app"></div>
 
-<!-- Firebase SDK -->
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-  import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-           signOut, onAuthStateChanged }
-    from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-
-  const firebaseConfig = {
-    apiKey:    "AIzaSyD-placeholder-replace-with-real-key",
-    authDomain:"tapplus-a2d09.firebaseapp.com",
-    projectId: "tapplus-a2d09",
-  };
-
-  const fbApp  = initializeApp(firebaseConfig);
-  const fbAuth = getAuth(fbApp);
-
-  // Expose to app.js
-  window._fbAuth = fbAuth;
-  window._fbSignIn   = (email, pw) => signInWithEmailAndPassword(fbAuth, email, pw);
-  window._fbSignUp   = (email, pw) => createUserWithEmailAndPassword(fbAuth, email, pw);
-  window._fbSignOut  = ()          => signOut(fbAuth);
-  window._fbOnAuth   = (cb)        => onAuthStateChanged(fbAuth, cb);
-</script>
-
-<!-- API Client -->
+<!-- Firebase Compat SDK (synchronous, no module issues) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="/api-client.js"></script>
-
-<!-- Main App -->
 <script src="/app.js"></script>
 
 </body>
