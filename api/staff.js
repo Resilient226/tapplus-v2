@@ -36,9 +36,12 @@ module.exports = async function handler(req, res) {
 
   // ── GET ──────────────────────────────────────────────────────────────────
   if (req.method === 'GET') {
-    // Any authenticated session for this business can read staff
-    if (!session || (session.bizId !== bizId && session.role !== 'superAdmin')) {
-      return err(res, 'Unauthorized', 401);
+    // Allow public access for customer tap pages (public=1)
+    const isPublic = req.query.public === '1';
+    if (!isPublic) {
+      if (!session || (session.bizId !== bizId && session.role !== 'superAdmin')) {
+        return err(res, 'Unauthorized', 401);
+      }
     }
 
     if (id) {
