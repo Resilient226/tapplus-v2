@@ -83,7 +83,10 @@ function renderHome(){
           style="text-align:center;font-size:32px;font-weight:900;letter-spacing:.2em;padding:18px;margin-bottom:12px"
           onkeydown="if(event.key==='Enter')window._go()"/>
         <button class="btn btn-primary btn-full" onclick="window._go()">Continue →</button>
-        <div style="margin-top:32px;text-align:center">
+        <button class="btn btn-ghost btn-full" style="margin-top:10px" onclick="window._ownerEntry()">
+          Owner / Create Account
+        </button>
+        <div style="margin-top:24px;text-align:center">
           <button onclick="window._sa()" style="background:none;border:none;color:rgba(238,240,248,.12);font-size:11px;cursor:pointer;font-family:'Nunito',sans-serif">●</button>
         </div>
       </div>
@@ -96,6 +99,7 @@ function renderHome(){
     try{const d=await API.business.getByCode(code);State.biz=d.business;renderRoleSelect();}
     catch{showToast('Invalid store code');renderHome();}
   };
+  window._ownerEntry=function(){State.biz=null;renderOwnerLogin();};
   window._sa=function(){
     showModal(`<div class="modal-head"><div class="modal-title">Super Admin</div><button class="modal-close" onclick="closeModal()">×</button></div>
       <div style="text-align:center;padding:8px 0">
