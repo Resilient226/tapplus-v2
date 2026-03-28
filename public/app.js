@@ -1,12 +1,18 @@
 'use strict';
 
 // Firebase client (owner auth only)
-firebase.initializeApp({
-  apiKey:     "AIzaSyCRr397Iw_ZnmLB9Sw21bjx-05HP5bqa3g",
-  authDomain: "tapplus-a2d09.firebaseapp.com",
-  projectId:  "tapplus-a2d09",
-});
-const fbAuth = firebase.auth();
+// Replace apiKey with your real key from Firebase Console → Project Settings → Your Apps
+let fbAuth = null;
+try {
+  firebase.initializeApp({
+    apiKey:     "AIzaSyD-placeholder-replace-with-real-key",
+    authDomain: "tapplus-a2d09.firebaseapp.com",
+    projectId:  "tapplus-a2d09",
+  });
+  fbAuth = firebase.auth();
+} catch(e) {
+  console.warn("Firebase init failed — owner login unavailable:", e.message);
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const State = { session:null, biz:null, staff:[], taps:[], layout:null };
@@ -53,6 +59,10 @@ function renderAIBlock(id,prompt,key){
 
 // ── Router ────────────────────────────────────────────────────────────────────
 async function route(){
+  // Hide splash screen
+  var ld = document.getElementById('loading');
+  if (ld) { ld.classList.add('hidden'); setTimeout(function(){ ld.style.display='none'; }, 350); }
+
   const parts=location.pathname.split('/').filter(Boolean);
   if(parts.length>=3&&parts[1]==='tap')return renderTapPage(parts[0],parts[2]);
   if(parts.length>=2&&parts[1]==='dashboard')return renderDashboardEntry(parts[0]);
