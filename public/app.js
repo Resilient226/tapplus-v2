@@ -5,7 +5,7 @@
 let fbAuth = null;
 try {
   firebase.initializeApp({
-    apiKey:     "AIzaSyCRr397Iw_ZnmLB9Sw21bjx-05HP5bqa3g",
+    apiKey:     "AIzaSyD-placeholder-replace-with-real-key",
     authDomain: "tapplus-a2d09.firebaseapp.com",
     projectId:  "tapplus-a2d09",
   });
@@ -215,7 +215,15 @@ function renderOwnerLogin(){
     if(!fbAuth){showToast('Firebase not configured — update API key in app.js');return;}
     showLoading('Creating account…');
     try{const c=await fbAuth.createUserWithEmailAndPassword(email,pass);const t=await c.user.getIdToken();State._ownerToken=t;renderCreateBusiness(t);}
-    catch(e){app().innerHTML='';renderOwnerLogin();showToast(e.message||'Registration failed');}
+    catch(e){
+      app().innerHTML='';
+      renderOwnerLogin();
+      if(e.code==='auth/email-already-in-use'){
+        showToast('Email already registered — try Sign In',4000);
+      } else {
+        showToast(e.message||'Registration failed');
+      }
+    }
   };
 }
 
@@ -223,12 +231,13 @@ function renderOwnerLogin(){
 function renderCreateBusiness(idToken){
   app().innerHTML=`
     <div class="page" style="padding-top:60px">
+      <button onclick="renderOwnerLogin()" style="background:none;border:none;color:var(--gray);font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;margin-bottom:20px;padding:0">← Back</button>
       <h1 style="margin-bottom:6px">Create Business</h1>
       <div style="color:var(--gray);font-size:14px;margin-bottom:24px">Set up your Tap+ location</div>
       <div style="display:flex;flex-direction:column;gap:12px">
         <div><div class="field-lbl">Business Name</div><input class="inp" id="cb-n" placeholder="The James Room"/></div>
-        <div><div class="field-lbl">Admin PIN (4 digits)</div><input class="inp" id="cb-a" type="number" inputmode="numeric" placeholder="1234" maxlength="4"/></div>
-        <div><div class="field-lbl">Manager PIN (4 digits)</div><input class="inp" id="cb-m" type="number" inputmode="numeric" placeholder="5678" maxlength="4"/></div>
+        <div><div class="field-lbl">Admin PIN (4-6 digits)</div><input class="inp" id="cb-a" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 1234"/></div>
+        <div><div class="field-lbl">Manager PIN (4-6 digits)</div><input class="inp" id="cb-m" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 5678"/></div>
         <button class="btn btn-primary btn-full" style="margin-top:8px" onclick="window._create()">Create →</button>
       </div>
     </div>`;
@@ -712,7 +721,7 @@ function renderSettingsTab(body){
 }
 
 // ── Owner Dashboard ───────────────────────────────────────────────────────────
-function renderOwnerDashboard(){
+window.renderOwnerDashboard = function renderOwnerDashboard(){
   const sess=State.session,bizs=sess?.businesses||[];
   app().innerHTML=`
     <div style="max-width:480px;margin:0 auto;padding:20px 16px 80px">
@@ -738,7 +747,7 @@ function renderOwnerDashboard(){
 }
 
 // ── Super Admin ───────────────────────────────────────────────────────────────
-function renderSuperAdminDashboard(){
+window.renderSuperAdminDashboard = function renderSuperAdminDashboard(){
   app().innerHTML=`
     <div style="max-width:480px;margin:0 auto;padding:20px 16px 80px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-top:8px">
@@ -787,7 +796,7 @@ function renderSuperAdminDashboard(){
   window._saT('layout');
 }
 
-async function saBiz() {
+window.saBiz = async function saBiz() {
   var body = $('sa-body');
   if (!body) return;
   body.innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></div>';
@@ -956,6 +965,23 @@ async function renderTapPage(bizSlug,staffSlug){
   const b=biz.branding||{};
   document.body.style.background=b.bgColor||'#07080c';
 
+  // Load staff to find this staff member's profile
+  var staffRec = null;
+  try {
+    // We need a temp session to fetch staff — use a public-friendly approach
+    // Staff list requires auth, so we'll try with no auth and fall back gracefully
+    var staffResp = await fetch('/api/staff?bizId='+biz.id+'&public=1');
+    if (staffResp.ok) {
+      var staffData = await staffResp.json();
+      var allStaff = staffData.staff || [];
+      // Match by slug: "firstname-l" format
+      staffRec = allStaff.find(function(s) {
+        var slug = (s.firstName+'-'+s.lastInitial).toLowerCase().replace(/[^a-z0-9-]/g,'');
+        return slug === staffSlug || s.id === staffSlug;
+      });
+    }
+  } catch(e2) { /* staff popup optional */ }
+
   // Tap cooldown
   const ck='tp_'+biz.id+'_'+staffSlug,last=parseInt(sessionStorage.getItem(ck)||'0'),now=Date.now(),dup=now-last<1800000;
   const tapId=sessionStorage.getItem(ck+'_id')||'tap_'+now;
@@ -989,10 +1015,42 @@ async function renderTapPage(bizSlug,staffSlug){
   }
 
   window._cs=function(r){updateStars(r);setTimeout(()=>afterRate(r),200);};
+  window._toggleStaffCard=function(){
+    var c=document.getElementById('staff-popup');
+    if(c)c.style.display=c.style.display==='none'?'block':'none';
+  };
+  document.addEventListener('click',function(e){
+    var popup=document.getElementById('staff-popup');
+    var bubble=document.getElementById('staff-bubble');
+    if(popup&&bubble&&!bubble.contains(e.target)&&!popup.contains(e.target))popup.style.display='none';
+  });
+
+  var staffBubbleHTML = staffRec ? (
+    '<div id="staff-bubble" onclick="window._toggleStaffCard()" style="position:absolute;top:16px;right:16px;cursor:pointer;z-index:10">'
+    + (staffRec.photo
+      ? '<img src="'+esc(staffRec.photo)+'" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid '+(b.brandColor||'#00e5a0')+';display:block"/>'
+      : '<div style="width:48px;height:48px;border-radius:50%;background:'+(b.brandColor||'#00e5a0')+'22;border:2px solid '+(b.brandColor||'#00e5a0')+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:'+(b.brandColor||'#00e5a0')+'">'+(staffRec.firstName[0]+(staffRec.lastInitial||'')[0]).toUpperCase()+'</div>')
+    + '</div>'
+    + '<div id="staff-popup" style="display:none;position:absolute;top:72px;right:16px;background:#0e0f15;border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:16px 18px;min-width:160px;max-width:240px;z-index:20;box-shadow:0 8px 32px rgba(0,0,0,.5)">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+    + (staffRec.photo ? '<img src="'+esc(staffRec.photo)+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover"/>' : '<div style="width:36px;height:36px;border-radius:50%;background:'+(b.brandColor||'#00e5a0')+'22;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:'+(b.brandColor||'#00e5a0')+'">'+(staffRec.firstName[0]+(staffRec.lastInitial||'')[0]).toUpperCase()+'</div>')
+    + '<div><div style="font-weight:800;font-size:14px">' + esc(staffRec.firstName+' '+staffRec.lastInitial+'.') + '</div>'
+    + (staffRec.title ? '<div style="font-size:11px;color:'+(b.brandColor||'#00e5a0')+';font-weight:600;margin-top:2px">'+esc(staffRec.title)+'</div>' : '')
+    + '</div></div>'
+    + (staffRec.links||[]).filter(function(l){return (b.allowedStaffLinks||{})[l.type];}).map(function(l){
+        var icons={spotify:'🎵',phone:'📞',email:'✉️',instagram:'📸',tiktok:'🎵',custom:'🔗'};
+        var href=l.type==='phone'?'tel:'+l.url:l.type==='email'?'mailto:'+l.url:l.url;
+        return '<a href="'+esc(href)+'" target="_blank" rel="noreferrer" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);text-decoration:none">'
+          +'<span style="font-size:16px">'+(icons[l.type]||'🔗')+'</span>'
+          +'<span style="font-size:12px;font-weight:600;color:'+(b.textColor||'#fff')+'">'+esc(l.label||l.type)+'</span></a>';
+      }).join('')
+    + '</div>'
+  ) : '';
 
   app().innerHTML=`
     <style>body{background:${esc(b.bgColor||'#07080c')};color:${esc(b.textColor||'#fff')}}.star{cursor:pointer;font-size:42px;transition:transform .15s;filter:grayscale(1);opacity:.3}.star.lit{filter:none;opacity:1}.star:active{transform:scale(1.25)}</style>
-    <div class="tap-page">
+    <div class="tap-page" style="position:relative">
+      ${staffBubbleHTML}
       <div style="margin-top:16px;margin-bottom:24px;text-align:center">
         ${b.logoUrl?`<img src="${esc(b.logoUrl)}" style="height:80px;max-width:220px;object-fit:contain;border-radius:16px"/>`:`<div style="font-size:28px;font-weight:900">${esc(b.name)}</div>`}
         ${b.tagline?`<div style="font-size:13px;opacity:.4;margin-top:8px">${esc(b.tagline)}</div>`:''}
