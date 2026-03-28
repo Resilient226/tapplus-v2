@@ -5,7 +5,7 @@
 let fbAuth = null;
 try {
   firebase.initializeApp({
-    apiKey:     "AIzaSyCRr397Iw_ZnmLB9Sw21bjx-05HP5bqa3g",
+    apiKey:     "AIzaSyD-placeholder-replace-with-real-key",
     authDomain: "tapplus-a2d09.firebaseapp.com",
     projectId:  "tapplus-a2d09",
   });
