@@ -100,13 +100,23 @@ function renderHome(){
     showModal(`<div class="modal-head"><div class="modal-title">Super Admin</div><button class="modal-close" onclick="closeModal()">×</button></div>
       <div style="text-align:center;padding:8px 0">
         <div style="font-size:18px;font-weight:800;margin-bottom:16px">Enter PIN</div>
-        <div class="pin-display"><div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div><div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div></div>
-        <div class="pin-grid">${['1','2','3','4','5','6','7','8','9','','0','del'].map(k=>k===''?'<div></div>':`<button class="pin-key${k==='del'?' del':''}" onclick="window._pin('${k}')">${k==='del'?'⌫':k}</button>`).join('')}</div>
+        <div class="pin-display" style="gap:10px">
+          <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+          <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+          <div class="pin-dot" id="pd4"></div><div class="pin-dot" id="pd5"></div>
+        </div>
+        <div class="pin-grid">${['1','2','3','4','5','6','7','8','9','del','0','go'].map(k=>`<button class="pin-key${k==='del'||k==='go'?' del':''}" onclick="window._pin('${k}')" style="${k==='go'?'background:var(--green);color:var(--black);border-color:var(--green)':''}">${k==='del'?'⌫':k==='go'?'→':k}</button>`).join('')}</div>
       </div>`);
     let pin='';
     window._pin=function(v){
       if(v==='del'){pin=pin.slice(0,-1);}
-      else if(pin.length<4){pin+=v;if(pin.length===4){setTimeout(async()=>{closeModal();showLoading('Authenticating…');try{const d=await API.auth.loginSuperAdmin(pin);State.session=d;renderSuperAdminDashboard();}catch{showToast('Invalid PIN');renderHome();}},150);return;}}
+      else if(v==='go'){
+        if(pin.length<4){showToast('Enter at least 4 digits');return;}
+        closeModal();showLoading('Authenticating…');
+        API.auth.loginSuperAdmin(pin).then(d=>{State.session=d;renderSuperAdminDashboard();}).catch(()=>{showToast('Invalid PIN');renderHome();});
+        return;
+      }
+      else if(pin.length<6){pin+=v;}
       document.querySelectorAll('.pin-dot').forEach((d,i)=>d.classList.toggle('filled',i<pin.length));
     };
   };
@@ -142,30 +152,32 @@ function renderPinLogin(role){
       <div style="font-size:13px;color:var(--gray);margin-bottom:8px">${esc(State.biz?.name)}</div>
       <div style="font-size:20px;font-weight:800;margin-bottom:4px">${titles[role]}</div>
       <div style="font-size:13px;color:var(--gray);margin-bottom:20px">${subs[role]}</div>
-      <div class="pin-display"><div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div><div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div></div>
-      <div class="pin-grid">${['1','2','3','4','5','6','7','8','9','','0','del'].map(k=>k===''?'<div></div>':`<button class="pin-key${k==='del'?' del':''}" onclick="window._pin('${k}')">${k==='del'?'⌫':k}</button>`).join('')}</div>
+      <div class="pin-display" style="gap:10px">
+        <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+        <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+        <div class="pin-dot" id="pd4"></div><div class="pin-dot" id="pd5"></div>
+      </div>
+      <div class="pin-grid">${['1','2','3','4','5','6','7','8','9','del','0','go'].map(k=>`<button class="pin-key${k==='del'||k==='go'?' del':''}" onclick="window._pin('${k}')" style="${k==='go'?'background:var(--green);color:var(--black);border-color:var(--green)':''}">${k==='del'?'⌫':k==='go'?'→':k}</button>`).join('')}</div>
       <button onclick="renderRoleSelect()" style="margin-top:24px;background:none;border:none;color:var(--gray);font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif">← Back</button>
     </div>`;
 
   window._pin=async function(v){
     if(v==='del'){pin=pin.slice(0,-1);}
-    else if(pin.length<4){
-      pin+=v;
-      if(pin.length===4){
-        setTimeout(async()=>{
-          showLoading('Verifying…');
-          try{
-            let d;
-            if(role==='staff')d=await API.auth.loginStaff(State.biz.id,pin);
-            else if(role==='manager')d=await API.auth.loginManager(State.biz.id,pin);
-            else d=await API.auth.loginBizAdmin(State.biz.id,pin);
-            State.session=d;
-            await loadDashboardData();
-            renderDashboard();
-          }catch{showToast('Invalid PIN — try again');renderPinLogin(role);}
-        },150);return;
-      }
+    else if(v==='go'){
+      if(pin.length<4){showToast('Enter at least 4 digits');return;}
+      showLoading('Verifying…');
+      try{
+        let d;
+        if(role==='staff')d=await API.auth.loginStaff(State.biz.id,pin);
+        else if(role==='manager')d=await API.auth.loginManager(State.biz.id,pin);
+        else d=await API.auth.loginBizAdmin(State.biz.id,pin);
+        State.session=d;
+        await loadDashboardData();
+        renderDashboard();
+      }catch{showToast('Invalid PIN — try again');renderPinLogin(role);}
+      return;
     }
+    else if(pin.length<6){pin+=v;}
     document.querySelectorAll('.pin-dot').forEach((d,i)=>d.classList.toggle('filled',i<pin.length));
   };
 }
