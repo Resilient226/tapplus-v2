@@ -2,7 +2,7 @@
 
 // Firebase client (owner auth only)
 firebase.initializeApp({
-  apiKey:     "AIzaSyD-placeholder-replace-with-real-key",
+  apiKey:     "AIzaSyCRr397Iw_ZnmLB9Sw21bjx-05HP5bqa3g",
   authDomain: "tapplus-a2d09.firebaseapp.com",
   projectId:  "tapplus-a2d09",
 });
