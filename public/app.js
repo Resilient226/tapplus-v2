@@ -5,7 +5,7 @@
 let fbAuth = null;
 try {
   firebase.initializeApp({
-    apiKey:     "AIzaSyCRr397Iw_ZnmLB9Sw21bjx-05HP5bqa3g",
+    apiKey:     "AIzaSyD-placeholder-replace-with-real-key",
     authDomain: "tapplus-a2d09.firebaseapp.com",
     projectId:  "tapplus-a2d09",
   });
@@ -203,17 +203,19 @@ function renderOwnerLogin(){
   window._signin=async function(){
     const email=$('oe')?.value?.trim(),pass=$('op')?.value;
     if(!email||!pass){showToast('Enter email and password');return;}
+    if(!fbAuth){showToast('Firebase not configured — update API key in app.js');return;}
     showLoading('Signing in…');
     try{const c=await fbAuth.signInWithEmailAndPassword(email,pass);const t=await c.user.getIdToken();const d=await API.auth.loginOwner(t);State.session=d;renderOwnerDashboard();}
-    catch(e){showToast(e.message||'Sign in failed');renderOwnerLogin();}
+    catch(e){app().innerHTML='';renderOwnerLogin();showToast(e.message||'Sign in failed');}
   };
   window._register=async function(){
     const email=$('oe')?.value?.trim(),pass=$('op')?.value;
     if(!email||!pass){showToast('Enter email and password');return;}
-    if(pass.length<6){showToast('Password must be at least 6 characters');return;}
+    if(pass.length<6){showToast('Password must be 6+ characters');return;}
+    if(!fbAuth){showToast('Firebase not configured — update API key in app.js');return;}
     showLoading('Creating account…');
     try{const c=await fbAuth.createUserWithEmailAndPassword(email,pass);const t=await c.user.getIdToken();State._ownerToken=t;renderCreateBusiness(t);}
-    catch(e){showToast(e.message||'Registration failed');renderOwnerLogin();}
+    catch(e){app().innerHTML='';renderOwnerLogin();showToast(e.message||'Registration failed');}
   };
 }
 
@@ -296,7 +298,7 @@ function renderDashboard(){
     </div>
     <div class="nav-bar">
       <div class="nav-item active"><div class="nav-icon">📊</div><div>Dashboard</div></div>
-      <div class="nav-item" onclick="navigate('/${esc(biz.slug)}/tap/preview')"><div class="nav-icon">👁</div><div>Preview</div></div>
+      <div class="nav-item" onclick="window._preview()"><div class="nav-icon">👁</div><div>Preview</div></div>
       <div class="nav-item" onclick="window._logout()"><div class="nav-icon">🚪</div><div>Out</div></div>
     </div>`;
 
@@ -320,6 +322,62 @@ function renderDashboard(){
     }
   };
   window._logout=function(){API.auth.logout();State.session=null;State.biz=null;State.staff=[];State.taps=[];renderHome();};
+  window._preview=function(){
+    var biz=State.biz;if(!biz)return;
+    var b=biz.branding||{};
+    var links=biz.links||[];
+    var bulletinLinks=b.bulletinLinks||[];
+    app().innerHTML=`
+      <div style="position:fixed;top:0;left:0;right:0;z-index:100;
+        background:rgba(7,8,12,.95);backdrop-filter:blur(10px);
+        border-bottom:1px solid var(--border);padding:12px 16px;
+        display:flex;align-items:center;gap:12px">
+        <button onclick="renderDashboard()" style="background:rgba(255,255,255,.08);
+          border:1px solid var(--border);border-radius:8px;padding:7px 14px;
+          color:var(--white);font-size:13px;font-weight:700;cursor:pointer;
+          font-family:'Nunito',sans-serif">← Back</button>
+        <div style="font-size:13px;font-weight:700;color:var(--gray)">Preview Mode</div>
+      </div>
+      <div style="padding-top:56px">
+        <div class="tap-page">
+          <div style="margin-top:16px;margin-bottom:24px;text-align:center">
+            ${b.logoUrl?`<img src="${esc(b.logoUrl)}" style="height:80px;max-width:220px;object-fit:contain;border-radius:16px"/>`:`<div style="font-size:28px;font-weight:900">${esc(b.name||'Your Business')}</div>`}
+            ${b.tagline?`<div style="font-size:13px;opacity:.4;margin-top:8px">${esc(b.tagline)}</div>`:''}
+          </div>
+          <div style="text-align:center;margin-bottom:28px;width:100%">
+            <div style="font-size:20px;font-weight:900;margin-bottom:20px">${esc(b.ratingQuestion||'How was your experience today?')}</div>
+            <div style="display:flex;gap:10px;justify-content:center">
+              ${[1,2,3,4,5].map(i=>`<div id="pcs${i}" style="font-size:42px;cursor:pointer;transition:transform .15s;filter:grayscale(1);opacity:.3" onclick="window._pStar(${i})">★</div>`).join('')}
+            </div>
+          </div>
+          <div id="p-after" style="width:100%"></div>
+          ${bulletinLinks.length?`<div style="width:100%;margin-top:16px"><div style="font-size:10px;font-weight:700;opacity:.3;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;text-align:center">${esc(b.name)}</div>
+            ${bulletinLinks.map(l=>`<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px 18px;margin-bottom:10px">
+              <div style="font-weight:700;font-size:14px">${esc(l.label)}</div>
+              ${l.sublabel?`<div style="font-size:12px;opacity:.5;margin-top:4px">${esc(l.sublabel)}</div>`:''}</div>`).join('')}
+          </div>`:''}
+          ${links.length?`<div style="width:100%;margin-top:8px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;color:var(--gray);font-size:13px">
+            ${links.length} review link${links.length>1?'s':''} configured — shown after 4-5★ rating
+          </div>`:''}
+          <div style="position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.08;pointer-events:none">POWERED BY TAP+</div>
+        </div>
+      </div>`;
+    window._pStar=function(r){
+      for(var i=1;i<=5;i++){var el=document.getElementById('pcs'+i);if(el){el.style.filter=i<=r?'none':'grayscale(1)';el.style.opacity=i<=r?'1':'.3';}}
+      var after=document.getElementById('p-after');if(!after)return;
+      if(r>=4&&links.length){
+      if(r>=4&&links.length){
+        var rp=esc(b.reviewPrompt||"Share your experience!");
+        var linkHtml=links.map(function(l){return '<div style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px 16px;margin-bottom:10px"><div style="width:42px;height:42px;border-radius:12px;background:rgba(0,229,160,.1);display:flex;align-items:center;justify-content:center;font-size:20px">⭐</div><div style="flex:1;font-weight:700">'+esc(l.label||l.platform)+'</div></div>';}).join("");
+        after.innerHTML='<div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:800;margin-bottom:8px">'+rp+'</div></div>'+linkHtml;
+      } else if(r<=3){
+        var lm=esc(b.lowRatingMsg||"We're sorry to hear that.");
+        after.innerHTML='<div style="text-align:center;margin-bottom:12px"><div style="font-size:16px;font-weight:800">'+lm+'</div></div>'
+          +'<textarea style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px;color:#eef0f8;font-family:Nunito,sans-serif;outline:none;resize:none;min-height:90px;font-size:14px" placeholder="Tell us what happened…"></textarea>'
+          +'<div style="margin-top:10px;text-align:center;font-size:13px;color:rgba(238,240,248,.45)">(Preview only)</div>';
+      }
+    };
+  };
   window._tab(sections[0]);
 }
 
@@ -437,9 +495,8 @@ function renderBrandingTab(body,me){
   window._saveBr=async function(){
     const title=($('br-title')||{}).value?.trim()||'';
     const photo=photoData!==undefined?photoData:me.photo;
-    showLoading('Saving…');
     try{await API.staff.update(State.session.bizId,me.id,{title,photo,links});const idx=State.staff.findIndex(s=>s.id===me.id);if(idx>=0)State.staff[idx]={...State.staff[idx],title,photo,links};showToast('Saved ✨');renderDashboard();}
-    catch(e){showToast(e.message||'Save failed');renderDashboard();}
+    catch(e){showToast(e.message||'Save failed — '+e.message);}
   };
 }
 
@@ -542,7 +599,7 @@ function renderLinksTab(body){
       </div>`);
     window._doAddL=function(){const p=$('al-p')?.value||'Google',l=$('al-l')?.value?.trim()||p;let u=$('al-u')?.value?.trim()||'';if(!u){showToast('Enter URL');return;}if(!u.startsWith('http'))u='https://'+u;links.push({platform:p,label:l,url:u});closeModal();draw();};
   };
-  window._saveL=async function(){showLoading('Saving…');try{const d=await API.business.update(State.session.bizId,{links});State.biz={...State.biz,links:d.business.links};showToast('Saved ✓');draw();}catch(e){showToast(e.message||'Failed');draw();}};
+  window._saveL=async function(){try{const d=await API.business.update(State.session.bizId,{links});State.biz={...State.biz,links:d.business.links};showToast('Saved ✓');draw();}catch(e){showToast(e.message||'Failed — check connection');draw();}};
   draw();
 }
 
@@ -649,9 +706,8 @@ function renderSettingsTab(body){
       thankYouMsg:$('s-ty')?.value?.trim()||b.thankYouMsg,lowRatingMsg:$('s-lr')?.value?.trim()||b.lowRatingMsg,
       bulletinLinks,allowedStaffLinks:allowed,
     };
-    showLoading('Saving…');
     try{const d=await API.business.update(State.session.bizId,{branding});State.biz={...State.biz,...d.business};window._logoData=undefined;showToast('Settings saved ✓');renderDashboard();}
-    catch(e){showToast(e.message||'Failed');renderDashboard();}
+    catch(e){showToast(e.message||'Failed — '+e.message);renderSettingsTab($('dash-body'));}
   };
 }
 
@@ -776,12 +832,13 @@ async function saBiz() {
   // For now load a few known businesses by querying with empty slug search
   var allBiz = [];
   try {
-    // Try to get all businesses via a wildcard - our API doesn't support list-all yet
-    // So we'll show a search interface
-    draw([]);
-  } catch(e) {
-    draw([]);
-  }
+    var saR = await fetch('/api/business?listAll=1', {
+      headers: { 'Authorization': 'Bearer ' + API.auth.getToken() }
+    });
+    var saD = await saR.json();
+    if (saD.businesses) allBiz = saD.businesses;
+  } catch(saErr) { /* show empty list */ }
+  draw(allBiz);
 
   window._saSearch = async function(q) {
     if (!q || q.length < 2) return;
@@ -950,4 +1007,6 @@ async function renderTapPage(bizSlug,staffSlug){
       ${bulletinLinks.length?`<div style="width:100%;margin-top:8px"><div style="font-size:10px;font-weight:700;opacity:.3;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;text-align:center">${esc(b.name)}</div>${bulletinLinks.map(l=>linkRow(l)).join('')}</div>`:''}
     </div>
     <div style="position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.08;pointer-events:none">POWERED BY TAP+</div>`;
+}
+
 }
