@@ -192,24 +192,6 @@ html,body{height:100%;background:var(--black);color:var(--white);
 <!-- Firebase Compat SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-<script>
-  // ======================================================
-  // REPLACE THE API KEY BELOW WITH YOUR REAL FIREBASE KEY
-  // Firebase Console -> Project Settings -> Your Apps -> Web app -> apiKey
-  // This is safe to put here - it's a public key, not secret
-  // ======================================================
-  try {
-    firebase.initializeApp({
-      apiKey:    "AIzaSyCRr397Iw_ZnmLB9Sw21bjx-05HP5bqa3g",
-      authDomain:"tapplus-a2d09.firebaseapp.com",
-      projectId: "tapplus-a2d09",
-    });
-    window._fbAuth = firebase.auth();
-  } catch(e) {
-    console.warn("Firebase init:", e.message);
-    window._fbAuth = null;
-  }
-</script>
 <script src="/api-client.js"></script>
 <script src="/app.js"></script>
 </body>
