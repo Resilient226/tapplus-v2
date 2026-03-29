@@ -1,8 +1,18 @@
 'use strict';
 
-// Firebase Auth is initialized in index.html to preserve the API key across app.js updates
-// Access it via window._fbAuth set by index.html
-var fbAuth = window._fbAuth || null;
+// Firebase client (owner auth only)
+// Replace apiKey with your real key from Firebase Console → Project Settings → Your Apps
+let fbAuth = null;
+try {
+  firebase.initializeApp({
+    apiKey:     "AIzaSyCRr397Iw_ZnmLB9Sw21bjx-05HP5bqa3g",
+    authDomain: "tapplus-a2d09.firebaseapp.com",
+    projectId:  "tapplus-a2d09",
+  });
+  fbAuth = firebase.auth();
+} catch(e) {
+  console.warn("Firebase init failed — owner login unavailable:", e.message);
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const State = { session:null, biz:null, staff:[], taps:[], layout:null };
@@ -195,7 +205,7 @@ function renderOwnerLogin(){
     if(!email||!pass){showToast('Enter email and password');return;}
     if(!fbAuth){showToast('Firebase not configured — update API key in app.js');return;}
     showLoading('Signing in…');
-    try{const c=await fbAuth.signInWithEmailAndPassword(email,pass);const t=await c.user.getIdToken();const d=await API.auth.loginOwner(t);State.session=d;window.renderOwnerDashboard();}
+    try{const c=await fbAuth.signInWithEmailAndPassword(email,pass);const t=await c.user.getIdToken();const d=await API.auth.loginOwner(t);State.session=d;renderOwnerDashboard();}
     catch(e){app().innerHTML='';renderOwnerLogin();showToast(e.message||'Sign in failed');}
   };
   window._register=async function(){
@@ -365,9 +375,9 @@ function renderDashboard(){
       for(var i=1;i<=5;i++){var el=document.getElementById('pcs'+i);if(el){el.style.filter=i<=r?'none':'grayscale(1)';el.style.opacity=i<=r?'1':'.3';}}
       var after=document.getElementById('p-after');if(!after)return;
       if(r>=4&&links.length){
-      if(r>=4){
+      if(r>=4&&links.length){
         var rp=esc(b.reviewPrompt||"Share your experience!");
-        var linkHtml=links.length?links.map(function(l){return '<div style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px 16px;margin-bottom:10px"><div style="width:42px;height:42px;border-radius:12px;background:rgba(0,229,160,.1);display:flex;align-items:center;justify-content:center;font-size:20px">⭐</div><div style="flex:1;font-weight:700">'+esc(l.label||l.platform)+'</div></div>';}).join(""):"<div style='padding:16px;text-align:center;color:rgba(238,240,248,.5);font-size:14px'>No review links configured yet</div>";
+        var linkHtml=links.map(function(l){return '<div style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px 16px;margin-bottom:10px"><div style="width:42px;height:42px;border-radius:12px;background:rgba(0,229,160,.1);display:flex;align-items:center;justify-content:center;font-size:20px">⭐</div><div style="flex:1;font-weight:700">'+esc(l.label||l.platform)+'</div></div>';}).join("");
         after.innerHTML='<div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:800;margin-bottom:8px">'+rp+'</div></div>'+linkHtml;
       } else if(r<=3){
         var lm=esc(b.lowRatingMsg||"We're sorry to hear that.");
@@ -526,7 +536,7 @@ function renderTeamTab(){
 function renderStaffTab(body){
   function draw(){
     body.innerHTML=`<button class="btn btn-primary btn-full" style="margin-bottom:14px" onclick="window._addS()">+ Add Staff Member</button>
-    ${State.staff.length===0?`<div class="card" style="text-align:center;color:var(--gray);padding:40px">No staff yet.</div>`:State.staff.map(s=>{var tapUrl='/'+State.biz.slug+'/tap/'+s.id;return`<div class="plain-card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">${staffAvatar(s,44)}<div style="flex:1;min-width:0"><div style="font-weight:700">${esc(staffDisplay(s))}</div><div style="font-size:12px;color:var(--gray)">${esc(s.title||'Staff')}</div></div><div style="display:flex;gap:6px"><button onclick="window._editS('${s.id}')" class="btn btn-ghost btn-sm">Edit</button><button onclick="window._togS('${s.id}',${s.active})" class="btn btn-sm" style="background:${s.active?'rgba(255,68,85,.1)':'rgba(0,229,160,.1)'};color:${s.active?'var(--red)':'var(--green)'};border:1px solid ${s.active?'rgba(255,68,85,.2)':'rgba(0,229,160,.2)'}">${s.active?'Deactivate':'Activate'}</button></div></div><div style="font-size:11px;color:var(--gray);background:rgba(255,255,255,.03);border-radius:8px;padding:6px 10px;font-family:monospace;display:flex;align-items:center;justify-content:space-between"><span>${esc(tapUrl)}</span><button onclick="navigator.clipboard&&navigator.clipboard.writeText(window.location.origin+'${esc(tapUrl)}').then(()=>showToast('URL copied!'))" style="background:none;border:none;color:var(--green);font-size:11px;cursor:pointer;font-family:inherit;font-weight:700">Copy</button></div></div>`;}).join('')}`;
+    ${State.staff.length===0?`<div class="card" style="text-align:center;color:var(--gray);padding:40px">No staff yet.</div>`:State.staff.map(s=>`<div class="plain-card" style="display:flex;align-items:center;gap:12px">${staffAvatar(s,44)}<div style="flex:1;min-width:0"><div style="font-weight:700">${esc(staffDisplay(s))}</div><div style="font-size:12px;color:var(--gray)">${esc(s.title||'Staff')}</div></div><div style="display:flex;gap:6px"><button onclick="window._editS('${s.id}')" class="btn btn-ghost btn-sm">Edit</button><button onclick="window._togS('${s.id}',${s.active})" class="btn btn-sm" style="background:${s.active?'rgba(255,68,85,.1)':'rgba(0,229,160,.1)'};color:${s.active?'var(--red)':'var(--green)'};border:1px solid ${s.active?'rgba(255,68,85,.2)':'rgba(0,229,160,.2)'}">${s.active?'Deactivate':'Activate'}</button></div></div>`).join('')}`;
   }
   window._addS=function(){
     showModal(`<div class="modal-head"><div class="modal-title">Add Staff</div><button class="modal-close" onclick="closeModal()">×</button></div>
@@ -541,7 +551,7 @@ function renderStaffTab(body){
       const fn=$('ns-fn')?.value?.trim(),li=$('ns-li')?.value?.trim().toUpperCase(),ti=$('ns-ti')?.value?.trim(),pa=$('ns-pa')?.value?.trim();
       if(!fn){showToast('Enter first name');return;}if(!li){showToast('Enter last initial');return;}
       if(!pa||pa.length!==4){showToast('Passcode must be 4 digits');return;}
-      closeModal();
+      closeModal();showLoading('Adding…');
       try{const d=await API.staff.create(State.session.bizId,{firstName:fn,lastInitial:li,title:ti,passcode:pa});State.staff.push(d.staff);showToast(fn+' added ✓');draw();}
       catch(e){showToast(e.message||'Failed');draw();}
     };
@@ -993,10 +1003,8 @@ async function renderTapPage(bizSlug,staffSlug){
 
   function afterRate(r){
     const el=$('after');if(!el)return;
-    if(r>=4){
-      var promptMsg=esc(b.reviewPrompt||'Share your experience!');
-      var linksHtml=links.length?links.map(l=>linkRow(l)).join(''):'<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:18px;text-align:center;color:rgba(238,240,248,.5);font-size:14px">No review links configured yet</div>';
-      el.innerHTML='<div style="text-align:center;margin-bottom:20px"><div style="font-size:18px;font-weight:800;margin-bottom:8px">'+promptMsg+'</div></div>'+linksHtml;
+    if(r>=4&&links.length){
+      el.innerHTML=`<div style="text-align:center;margin-bottom:20px"><div style="font-size:18px;font-weight:800;margin-bottom:8px">${esc(b.reviewPrompt||'Share your experience!')}</div></div>${links.map(l=>linkRow(l)).join('')}`;
       API.taps.update(tapId,{rating:r,status:'rated'}).catch(console.error);
     }else if(r<=3){
       el.innerHTML=`<div style="text-align:center;margin-bottom:16px"><div style="font-size:18px;font-weight:800;margin-bottom:6px">${esc(b.lowRatingMsg||"We're sorry to hear that.")}</div></div>
@@ -1057,4 +1065,6 @@ async function renderTapPage(bizSlug,staffSlug){
       ${bulletinLinks.length?`<div style="width:100%;margin-top:8px"><div style="font-size:10px;font-weight:700;opacity:.3;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;text-align:center">${esc(b.name)}</div>${bulletinLinks.map(l=>linkRow(l)).join('')}</div>`:''}
     </div>
     <div style="position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.08;pointer-events:none">POWERED BY TAP+</div>`;
+}
+
 }
