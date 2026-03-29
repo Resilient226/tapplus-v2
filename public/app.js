@@ -191,6 +191,7 @@ function renderOwnerLogin(){
       </div>
     </div>`;
   window._signin=async function(){
+    if(!fbAuth){fbAuth=window._fbAuth||null;}
     const email=$('oe')?.value?.trim(),pass=$('op')?.value;
     if(!email||!pass){showToast('Enter email and password');return;}
     if(!fbAuth){showToast('Firebase not configured — update API key in app.js');return;}
@@ -199,6 +200,7 @@ function renderOwnerLogin(){
     catch(e){app().innerHTML='';renderOwnerLogin();showToast(e.message||'Sign in failed');}
   };
   window._register=async function(){
+    if(!fbAuth){fbAuth=window._fbAuth||null;}
     const email=$('oe')?.value?.trim(),pass=$('op')?.value;
     if(!email||!pass){showToast('Enter email and password');return;}
     if(pass.length<6){showToast('Password must be 6+ characters');return;}
@@ -234,8 +236,8 @@ function renderCreateBusiness(idToken){
   window._create=async function(){
     const name=$('cb-n')?.value?.trim(),adminPin=$('cb-a')?.value?.trim(),mgrPin=$('cb-m')?.value?.trim();
     if(!name){showToast('Enter business name');return;}
-    if(adminPin?.length!==4){showToast('Admin PIN must be 4 digits');return;}
-    if(mgrPin?.length!==4){showToast('Manager PIN must be 4 digits');return;}
+    if(!adminPin||adminPin.length<4){showToast('Admin PIN must be at least 4 digits');return;}
+    if(!mgrPin||mgrPin.length<4){showToast('Manager PIN must be at least 4 digits');return;}
     if(adminPin===mgrPin){showToast('PINs must be different');return;}
     showLoading('Creating…');
     try{
