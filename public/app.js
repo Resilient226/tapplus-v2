@@ -1060,4 +1060,4 @@ async function renderTapPage(bizSlug,staffSlug){
     </div>
     <div style="position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.08;pointer-events:none">POWERED BY TAP+</div>`;
 }
-}
+
