@@ -23,21 +23,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return err(res, 'Method not allowed', 405);
 
   const { type } = req.body || {};
-  if (!type) return err(res, 'Login type required');if (type === 'superAdmin') {
-  const { pin } = req.body;
-  if (!pin) return err(res, 'PIN required');
-
-  console.log('SUPER_ADMIN_PIN_HASH exists:', !!SUPER_ADMIN_PIN_HASH);
-  console.log('PIN_SALT exists:', !!process.env.PIN_SALT);
-
-  if (!SUPER_ADMIN_PIN_HASH) return err(res, 'Super admin not configured', 500);
-  if (!verifyPin(pin, SUPER_ADMIN_PIN_HASH)) {
-    return err(res, 'Invalid PIN', 401);
-  }
-
-  const token = signToken({ role: 'superAdmin' });
-  return ok(res, { token, role: 'superAdmin' });
-}
+  if (!type) return err(res, 'Login type required');
 
   // ── Owner login via Firebase Auth ────────────────────────────────────────
   if (type === 'owner') {
@@ -146,6 +132,15 @@ module.exports = async function handler(req, res) {
   if (type === 'superAdmin') {
     const { pin } = req.body;
     if (!pin) return err(res, 'PIN required');
+
+    // DEBUG — remove after confirming login works
+    console.log('[SA] pin length:', pin ? pin.length : 'null');
+    console.log('[SA] PIN_SALT set:', !!process.env.PIN_SALT, 'length:', (process.env.PIN_SALT||'').length);
+    console.log('[SA] HASH set:', !!SUPER_ADMIN_PIN_HASH, 'length:', (SUPER_ADMIN_PIN_HASH||'').length);
+    const testHash = require('crypto').createHash('sha256').update(pin + (process.env.PIN_SALT||'')).digest('hex');
+    console.log('[SA] computed hash prefix:', testHash.slice(0,8));
+    console.log('[SA] stored  hash prefix:', (SUPER_ADMIN_PIN_HASH||'').slice(0,8));
+    console.log('[SA] match:', testHash === SUPER_ADMIN_PIN_HASH);
 
     if (!SUPER_ADMIN_PIN_HASH) return err(res, 'Super admin not configured', 500);
     if (!verifyPin(pin, SUPER_ADMIN_PIN_HASH)) {
