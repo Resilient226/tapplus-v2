@@ -67,7 +67,7 @@ function renderHome(){
   app().innerHTML=`
     <div class="page-center">
       <div style="font-size:56px;font-weight:900;letter-spacing:-.04em;margin-bottom:4px">Tap<span style="color:var(--green)">+</span></div>
-      <div style="font-size:14px;color:var(--gray);margin-bottom:40px">Enter your store code</div>
+      <div style="font-size:14px;color:var(--gray);margin-bottom:40px">Enter your store codes</div>
       <div style="width:100%;max-width:320px">
         <input class="inp" id="code-inp" placeholder="4-digit code" type="number" inputmode="numeric" maxlength="4"
           style="text-align:center;font-size:32px;font-weight:900;letter-spacing:.2em;padding:18px;margin-bottom:12px"
