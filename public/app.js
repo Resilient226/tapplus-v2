@@ -977,8 +977,8 @@ async function renderTapPage(bizSlug,staffSlug){
 
   // Tap cooldown
   const ck='tp_'+biz.id+'_'+staffSlug,last=parseInt(sessionStorage.getItem(ck)||'0'),now=Date.now(),dup=now-last<1800000;
-  const tapId=sessionStorage.getItem(ck+'_id')||'tap_'+now;
-  if(!dup){sessionStorage.setItem(ck,String(now));sessionStorage.setItem(ck+'_id',tapId);API.taps.log({bizId:biz.id,bizSlug:biz.slug,staffId:staffSlug,staffName:staffSlug,status:'tapped'}).catch(console.error);}
+  let tapId=sessionStorage.getItem(ck+'_id')||null;
+  if(!dup){sessionStorage.setItem(ck,String(now));API.taps.log({bizId:biz.id,bizSlug:biz.slug,staffId:staffSlug,staffName:staffSlug,status:'tapped'}).then(function(d){tapId=d.tap.id;sessionStorage.setItem(ck+'_id',tapId);}).catch(console.error);}
 
   const bulletinLinks=b.bulletinLinks||[];
   const links=biz.links||[];
@@ -1000,12 +1000,12 @@ async function renderTapPage(bizSlug,staffSlug){
       var promptMsg=esc(b.reviewPrompt||'Share your experience!');
       var linksHtml=links.length?links.map(l=>linkRow(l)).join(''):'<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:18px;text-align:center;color:rgba(238,240,248,.5);font-size:14px">No review links configured yet</div>';
       el.innerHTML='<div style="text-align:center;margin-bottom:20px"><div style="font-size:18px;font-weight:800;margin-bottom:8px">'+promptMsg+'</div></div>'+linksHtml;
-      API.taps.update(tapId,{rating:r,status:'rated'}).catch(console.error);
+      if(tapId)API.taps.update(tapId,{rating:r,status:'rated'}).catch(console.error);
     }else if(r<=3){
       el.innerHTML=`<div style="text-align:center;margin-bottom:16px"><div style="font-size:18px;font-weight:800;margin-bottom:6px">${esc(b.lowRatingMsg||"We're sorry to hear that.")}</div></div>
         <textarea id="fb-t" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px;color:inherit;font-size:14px;font-family:'Nunito',sans-serif;outline:none;resize:none;min-height:100px;margin-bottom:12px" placeholder="Tell us what happened…"></textarea>
         <button onclick="window._fb(${r})" style="width:100%;background:${esc(b.brandColor||'#00e5a0')};color:#07080c;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif">Submit</button>`;
-      window._fb=async function(rating){const text=$('fb-t')?.value?.trim()||'';await API.taps.update(tapId,{rating,feedback:text,status:'rated'}).catch(console.error);el.innerHTML=`<div style="text-align:center;padding:20px"><div style="font-size:40px;margin-bottom:12px">🙏</div><div style="font-size:18px;font-weight:800">${esc(b.thankYouMsg||'Thank you for your feedback!')}</div></div>`;};
+      window._fb=async function(rating){const text=$('fb-t')?.value?.trim()||'';if(tapId)await API.taps.update(tapId,{rating,feedback:text,status:'rated'}).catch(console.error);el.innerHTML=`<div style="text-align:center;padding:20px"><div style="font-size:40px;margin-bottom:12px">🙏</div><div style="font-size:18px;font-weight:800">${esc(b.thankYouMsg||'Thank you for your feedback!')}</div></div>`;};
     }
   }
 
