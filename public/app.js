@@ -884,7 +884,8 @@ function renderSettingsTab(body) {
     const added = new Set(reviewLinks.map(l => l.platform));
     return platformLinks.filter(p => p.enabled && !added.has(p.platform));
   }
-  function _platIcon(p) {
+  function _platIcon(p, linkObj) {
+    if (linkObj && linkObj.icon) return linkObj.icon;
     return {google:'🔍',yelp:'⭐',tripadvisor:'🦉',opentable:'🍽️',facebook:'👍',custom:'🔗'}[(p||'').toLowerCase()]||'🔗';
   }
 
@@ -934,7 +935,7 @@ function renderSettingsTab(body) {
                 <div style="font-size:16px;color:rgba(238,240,248,.2);user-select:none">⠿</div>
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                    <span style="font-size:16px">${_platIcon(l.platform)}</span>
+                    <span style="font-size:16px">${_platIcon(l.platform, l)}</span>
                     <span style="font-weight:700;font-size:14px">${esc(l.label||l.platform)}</span>
                     ${i===0?`<span style="background:rgba(0,229,160,.15);color:#00e5a0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;border:1px solid rgba(0,229,160,.3)">5★ REDIRECT</span>`:''}
                   </div>
@@ -1009,7 +1010,7 @@ function renderSettingsTab(body) {
           ${avail2.map((p,i)=>`
             <button onclick="window._rlPick(${i})"
               style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px 16px;cursor:pointer;text-align:left;font-family:'Nunito',sans-serif;width:100%">
-              <div style="font-size:24px">${_platIcon(p.platform)}</div>
+              <div style="font-size:24px">${_platIcon(p.platform, p)}</div>
               <div style="min-width:0">
                 <div style="font-weight:700;font-size:14px;color:#eef0f8">${esc(p.label||p.platform)}</div>
                 <div style="font-size:11px;color:rgba(238,240,248,.35);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">${esc(p.url)}</div>
@@ -1161,15 +1162,6 @@ async function saBiz() {
   if (!body) return;
   body.innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></div>';
 
-  const PLATFORM_DEFAULTS = [
-    { platform: 'google',      label: 'Google',      url: '' },
-    { platform: 'yelp',        label: 'Yelp',        url: '' },
-    { platform: 'tripadvisor', label: 'TripAdvisor', url: '' },
-    { platform: 'opentable',   label: 'OpenTable',   url: '' },
-    { platform: 'facebook',    label: 'Facebook',    url: '' },
-    { platform: 'custom',      label: 'Custom',      url: '' },
-  ];
-
   var allBiz = [];
   try {
     var saR = await fetch('/api/business?listAll=1', { headers: { 'Authorization': 'Bearer ' + API.auth.getToken() } });
@@ -1177,26 +1169,180 @@ async function saBiz() {
     if (saD.businesses) allBiz = saD.businesses;
   } catch(e) {}
 
+  // ── Per-business link manager (accordion style) ───────────────────────────
+  // platformLinks: [{name, icon, url}] — stored on biz.platformLinks
+  // icon is an emoji the super admin picks
+
+  var EMOJI_OPTIONS = ['🔍','⭐','🦉','🍽️','👍','📘','🔗','📍','🏆','💬','📱','🌐','🎯','✨','🏅'];
+
+  window._saManageLinks = async function(bizId, bizName) {
+    showLoading('Loading…');
+    var bizData;
+    try {
+      var r = await API.business.getById(bizId);
+      bizData = r.business;
+    } catch(e) { showToast('Failed to load'); renderSuperAdminDashboard(); return; }
+
+    // platformLinks: array of {name, icon, url, enabled}
+    var links = (bizData.platformLinks || []).map(p => ({...p}));
+
+    function drawLinks() {
+      body.innerHTML = `
+        <button onclick="window._saT('biz')"
+          style="background:none;border:none;color:var(--gray);font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;margin-bottom:16px;padding:0">
+          ← Back
+        </button>
+        <div style="font-weight:700;font-size:16px;margin-bottom:2px">🔗 Review Platforms</div>
+        <div style="font-size:12px;color:var(--gray);margin-bottom:16px">${esc(bizName)}</div>
+
+        <div id="sa-link-items"></div>
+
+        <button onclick="window._saAddLink()"
+          style="width:100%;padding:14px;border-radius:12px;border:1px dashed rgba(0,229,160,.4);
+            background:rgba(0,229,160,.05);color:#00e5a0;font-size:14px;font-weight:700;
+            cursor:pointer;font-family:'Nunito',sans-serif;margin-bottom:16px">
+          + Add Platform
+        </button>
+
+        <button onclick="window._saSaveLinks('${bizId}')"
+          class="btn btn-primary btn-full">
+          Save Platforms
+        </button>`;
+
+      renderLinkItems();
+    }
+
+    function renderLinkItems() {
+      var el = document.getElementById('sa-link-items');
+      if (!el) return;
+      if (links.length === 0) {
+        el.innerHTML = '<div style="text-align:center;color:var(--gray);font-size:13px;padding:20px 0;margin-bottom:12px">No platforms yet. Tap + to add one.</div>';
+        return;
+      }
+      el.innerHTML = links.map((l, i) => `
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+          border-radius:14px;padding:14px;margin-bottom:10px">
+
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+            <div style="font-size:28px;width:44px;height:44px;background:rgba(255,255,255,.06);
+              border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              ${esc(l.icon||'🔗')}
+            </div>
+            <div style="flex:1;font-weight:700;font-size:15px">${esc(l.name||'Platform')}</div>
+            <button onclick="window._saRmLink(${i})"
+              style="background:rgba(255,68,85,.08);border:1px solid rgba(255,68,85,.2);
+                border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;
+                color:var(--red);cursor:pointer;font-family:'Nunito',sans-serif">
+              ✕
+            </button>
+          </div>
+
+          <div class="field-lbl">Platform Name</div>
+          <input class="inp" id="sa-ln-${i}" value="${esc(l.name||'')}"
+            placeholder="e.g. Google, Yelp"
+            oninput="window._saLinkField(${i},'name',this.value)"
+            style="margin-bottom:10px;font-size:13px"/>
+
+          <div class="field-lbl">Review URL</div>
+          <input class="inp" id="sa-lu-${i}" value="${esc(l.url||'')}"
+            placeholder="https://g.page/…"
+            oninput="window._saLinkField(${i},'url',this.value)"
+            style="margin-bottom:10px;font-size:13px"/>
+
+          <div class="field-lbl">Icon (tap to change)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            ${EMOJI_OPTIONS.map(em => `
+              <button onclick="window._saLinkIcon(${i},'${em}')"
+                style="width:40px;height:40px;border-radius:10px;font-size:20px;
+                  border:2px solid ${(l.icon||'🔗')===em?'#00e5a0':'rgba(255,255,255,.1)'};
+                  background:${(l.icon||'🔗')===em?'rgba(0,229,160,.12)':'rgba(255,255,255,.04)'};
+                  cursor:pointer">
+                ${em}
+              </button>`).join('')}
+          </div>
+        </div>`).join('');
+    }
+
+    window._saAddLink = function() {
+      links.push({ name: '', icon: '🔗', url: '', enabled: true });
+      renderLinkItems();
+      // Scroll to bottom
+      setTimeout(() => body.scrollTop = body.scrollHeight, 50);
+    };
+
+    window._saRmLink = function(i) {
+      links.splice(i, 1);
+      renderLinkItems();
+    };
+
+    window._saLinkField = function(i, field, val) {
+      if (links[i]) links[i][field] = val;
+    };
+
+    window._saLinkIcon = function(i, emoji) {
+      if (links[i]) { links[i].icon = emoji; renderLinkItems(); }
+    };
+
+    window._saSaveLinks = async function(bId) {
+      // Collect latest input values
+      links.forEach((l, i) => {
+        const nm = document.getElementById('sa-ln-'+i);
+        const ur = document.getElementById('sa-lu-'+i);
+        if (nm) l.name = nm.value.trim();
+        if (ur) l.url  = ur.value.trim();
+      });
+      const missing = links.filter(l => !l.name || !l.url);
+      if (missing.length) { showToast('Fill in name and URL for each platform'); return; }
+      // Ensure all have enabled flag and use 'platform' field for compatibility
+      const toSave = links.map(l => ({
+        platform: l.name.toLowerCase().replace(/\s+/g,'-'),
+        name: l.name,
+        label: l.name,
+        icon: l.icon || '🔗',
+        url: l.url,
+        enabled: true
+      }));
+      try {
+        await API.business.update(bId, { platformLinks: toSave });
+        showToast('Platforms saved ✓');
+      } catch(e) { showToast(e.message || 'Save failed'); }
+    };
+
+    drawLinks();
+  };
+
+  // ── Business list ─────────────────────────────────────────────────────────
   function draw(businesses) {
     body.innerHTML = `
-      <button class="btn btn-primary btn-full" style="margin-bottom:16px" onclick="window._saCreateBiz()">+ Create New Business</button>
-      <div style="display:flex;gap:8px;margin-bottom:16px">
-        <input class="inp" id="sa-biz-search" placeholder="Search by slug…" style="flex:1" oninput="window._saSearch(this.value)"/>
+      <button class="btn btn-primary btn-full" style="margin-bottom:16px"
+        onclick="window._saCreateBiz()">+ Create New Business</button>
+      <div style="margin-bottom:16px">
+        <input class="inp" id="sa-biz-search" placeholder="Search by slug…"
+          oninput="window._saSearch(this.value)"/>
       </div>
       <div id="sa-biz-list">
         ${businesses.length === 0
           ? '<div class="card" style="text-align:center;color:var(--gray);padding:30px">No businesses yet.</div>'
           : businesses.map(b => `
             <div class="plain-card">
-              <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+              <div style="display:flex;align-items:center;gap:10px">
                 <div style="flex:1;min-width:0">
-                  <div style="font-weight:700">${esc(b.name)}</div>
-                  <div style="font-size:12px;color:var(--gray)">Code: <span style="color:var(--green);font-weight:700">${esc(b.storeCode)}</span> · ${esc(b.slug)}</div>
+                  <div style="font-weight:700;font-size:15px">${esc(b.name)}</div>
+                  <div style="font-size:12px;color:var(--gray);margin-top:2px">
+                    Code: <span style="color:var(--green);font-weight:700">${esc(b.storeCode)}</span>
+                    · ${esc(b.slug)}
+                  </div>
                 </div>
-                <div style="display:flex;gap:6px">
-                  <button onclick="window._saManageLinks('${b.id}','${esc(b.name)}')" class="btn btn-ghost btn-sm">🔗 Links</button>
-                  <button onclick="window._saViewBiz('${b.id}')" class="btn btn-ghost btn-sm">View</button>
-                  <button onclick="window._saDeleteBiz('${b.id}','${esc(b.name)}')" class="btn btn-sm" style="background:rgba(255,68,85,.1);color:var(--red);border:1px solid rgba(255,68,85,.2)">Del</button>
+                <div style="display:flex;gap:6px;flex-shrink:0">
+                  <button onclick="window._saManageLinks('${b.id}','${esc(b.name)}')"
+                    class="btn btn-ghost btn-sm">🔗</button>
+                  <button onclick="window._saViewBiz('${b.id}')"
+                    class="btn btn-ghost btn-sm">View</button>
+                  <button onclick="window._saDeleteBiz('${b.id}','${esc(b.name)}')"
+                    class="btn btn-sm"
+                    style="background:rgba(255,68,85,.1);color:var(--red);border:1px solid rgba(255,68,85,.2)">
+                    Del
+                  </button>
                 </div>
               </div>
             </div>`).join('')
@@ -1206,105 +1352,27 @@ async function saBiz() {
 
   draw(allBiz);
 
-  // ── Manage platform links for a business ──────────────────────────────────
-  window._saManageLinks = async function(bizId, bizName) {
-    showLoading('Loading…');
-    var bizData;
-    try {
-      var r = await API.business.getById(bizId);
-      bizData = r.business;
-    } catch(e) { showToast('Failed to load business'); renderSuperAdminDashboard(); return; }
-
-    var platformLinks = bizData.platformLinks
-      ? [...bizData.platformLinks]
-      : PLATFORM_DEFAULTS.map(p => ({...p, enabled: false}));
-
-    // Ensure all defaults are represented
-    PLATFORM_DEFAULTS.forEach(def => {
-      if (!platformLinks.find(p => p.platform === def.platform)) {
-        platformLinks.push({...def, enabled: false});
-      }
-    });
-
-    body.innerHTML = `
-      <button onclick="window._saT('biz')" style="background:none;border:none;color:var(--gray);font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;margin-bottom:16px;padding:0">← Back to Businesses</button>
-      <div style="font-weight:700;font-size:16px;margin-bottom:4px">🔗 Review Links</div>
-      <div style="font-size:12px;color:var(--gray);margin-bottom:16px">${esc(bizName)}</div>
-      <div id="sa-links-list"></div>
-      <button onclick="window._saSaveLinks('${bizId}')" class="btn btn-primary btn-full" style="margin-top:8px">Save Platform Links</button>`;
-
-    function drawLinks() {
-      var ll = document.getElementById('sa-links-list');
-      if (!ll) return;
-      ll.innerHTML = platformLinks.map((p, i) => `
-        <div style="background:rgba(255,255,255,.04);border:1px solid ${p.enabled?'rgba(0,229,160,.25)':'rgba(255,255,255,.07)'};border-radius:12px;padding:14px;margin-bottom:10px">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:${p.enabled?'10px':'0'}">
-            <div style="font-size:22px">${_platformIcon(p.platform)}</div>
-            <div style="flex:1;font-weight:700;font-size:14px">${esc(p.label||p.platform)}</div>
-            <div class="toggle${p.enabled?' on':''}" onclick="window._saTogPlat(${i})" style="flex-shrink:0"><div class="toggle-thumb"></div></div>
-          </div>
-          ${p.enabled ? `
-            <div class="field-lbl">URL for ${esc(p.label||p.platform)}</div>
-            <input class="inp" id="sa-pl-url-${i}" value="${esc(p.url||'')}" placeholder="https://…" style="font-size:13px"/>
-            <div class="field-lbl" style="margin-top:8px">Display Label</div>
-            <input class="inp" id="sa-pl-lbl-${i}" value="${esc(p.label||p.platform)}" placeholder="${esc(p.platform)}" style="font-size:13px"/>
-          ` : ''}
-        </div>`).join('');
-    }
-
-    drawLinks();
-
-    window._saTogPlat = function(i) {
-      // Save current field values before redrawing
-      platformLinks.forEach((p, j) => {
-        if (p.enabled) {
-          const urlEl = document.getElementById('sa-pl-url-'+j);
-          const lblEl = document.getElementById('sa-pl-lbl-'+j);
-          if (urlEl) platformLinks[j].url   = urlEl.value.trim();
-          if (lblEl) platformLinks[j].label = lblEl.value.trim() || platformLinks[j].platform;
-        }
-      });
-      platformLinks[i].enabled = !platformLinks[i].enabled;
-      drawLinks();
-    };
-
-    window._saSaveLinks = async function(bId) {
-      // Collect current values
-      platformLinks.forEach((p, j) => {
-        if (p.enabled) {
-          const urlEl = document.getElementById('sa-pl-url-'+j);
-          const lblEl = document.getElementById('sa-pl-lbl-'+j);
-          if (urlEl) platformLinks[j].url   = urlEl.value.trim();
-          if (lblEl) platformLinks[j].label = lblEl.value.trim() || platformLinks[j].platform;
-        }
-      });
-      // Validate enabled ones have URLs
-      const missing = platformLinks.filter(p => p.enabled && !p.url);
-      if (missing.length) { showToast('Add URLs for all enabled platforms'); return; }
-      try {
-        await API.business.update(bId, { platformLinks });
-        showToast('Platform links saved ✓');
-      } catch(e) { showToast(e.message || 'Save failed'); }
-    };
-  };
-
   window._saSearch = async function(q) {
     if (!q || q.length < 2) return;
     try {
       var d = await API.business.getBySlug(q.trim().toLowerCase());
       if (d.business) {
-        window._saLastFound = d.business;
         var list = $('sa-biz-list');
         if (list) list.innerHTML = `
           <div class="plain-card">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:10px">
               <div style="flex:1;min-width:0">
-                <div style="font-weight:700">${esc(d.business.name)}</div>
-                <div style="font-size:12px;color:var(--gray)">Code: <span style="color:var(--green);font-weight:700">${esc(d.business.storeCode)}</span> · ${esc(d.business.slug)}</div>
+                <div style="font-weight:700;font-size:15px">${esc(d.business.name)}</div>
+                <div style="font-size:12px;color:var(--gray);margin-top:2px">
+                  Code: <span style="color:var(--green);font-weight:700">${esc(d.business.storeCode)}</span>
+                  · ${esc(d.business.slug)}
+                </div>
               </div>
-              <div style="display:flex;gap:6px">
-                <button onclick="window._saManageLinks('${d.business.id}','${esc(d.business.name)}')" class="btn btn-ghost btn-sm">🔗 Links</button>
-                <button onclick="window._saViewBiz('${d.business.id}')" class="btn btn-ghost btn-sm">View</button>
+              <div style="display:flex;gap:6px;flex-shrink:0">
+                <button onclick="window._saManageLinks('${d.business.id}','${esc(d.business.name)}')"
+                  class="btn btn-ghost btn-sm">🔗</button>
+                <button onclick="window._saViewBiz('${d.business.id}')"
+                  class="btn btn-ghost btn-sm">View</button>
               </div>
             </div>
           </div>`;
@@ -1340,17 +1408,24 @@ async function saBiz() {
         <button class="modal-close" onclick="closeModal()">×</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:12px">
-        <div><div class="field-lbl">Owner Email</div><input class="inp" id="sa-cb-email" type="email" placeholder="owner@business.com"/></div>
-        <div><div class="field-lbl">Owner Password</div><input class="inp" id="sa-cb-pass" type="password" placeholder="Min 6 characters"/></div>
-        <div><div class="field-lbl">Business Name</div><input class="inp" id="sa-cb-name" placeholder="The James Room"/></div>
-        <div><div class="field-lbl">Admin PIN (4-6 digits)</div><input class="inp" id="sa-cb-admin" type="number" inputmode="numeric" placeholder="e.g. 1234"/></div>
-        <div><div class="field-lbl">Manager PIN (4-6 digits)</div><input class="inp" id="sa-cb-mgr" type="number" inputmode="numeric" placeholder="e.g. 5678"/></div>
+        <div><div class="field-lbl">Owner Email</div>
+          <input class="inp" id="sa-cb-email" type="email" placeholder="owner@business.com"/></div>
+        <div><div class="field-lbl">Owner Password</div>
+          <input class="inp" id="sa-cb-pass" type="password" placeholder="Min 6 characters"/></div>
+        <div><div class="field-lbl">Business Name</div>
+          <input class="inp" id="sa-cb-name" placeholder="The James Room"/></div>
+        <div><div class="field-lbl">Admin PIN (4-6 digits)</div>
+          <input class="inp" id="sa-cb-admin" type="number" inputmode="numeric" placeholder="e.g. 1234"/></div>
+        <div><div class="field-lbl">Manager PIN (4-6 digits)</div>
+          <input class="inp" id="sa-cb-mgr" type="number" inputmode="numeric" placeholder="e.g. 5678"/></div>
         <button class="btn btn-primary btn-full" onclick="window._saDoCreate()">Create Business</button>
       </div>`);
     window._saDoCreate = async function() {
-      var email = $('sa-cb-email')?.value?.trim(), pass = $('sa-cb-pass')?.value;
-      var name  = $('sa-cb-name')?.value?.trim();
-      var adminPin = $('sa-cb-admin')?.value?.trim(), mgrPin = $('sa-cb-mgr')?.value?.trim();
+      var email    = $('sa-cb-email')?.value?.trim();
+      var pass     = $('sa-cb-pass')?.value;
+      var name     = $('sa-cb-name')?.value?.trim();
+      var adminPin = $('sa-cb-admin')?.value?.trim();
+      var mgrPin   = $('sa-cb-mgr')?.value?.trim();
       if (!email)   { showToast('Enter owner email'); return; }
       if (!pass || pass.length < 6) { showToast('Password must be 6+ characters'); return; }
       if (!name)    { showToast('Enter business name'); return; }
@@ -1375,6 +1450,7 @@ async function saBiz() {
     };
   };
 }
+
 
 // ── Customer Tap Page ─────────────────────────────────────────────────────────
 async function renderTapPage(bizSlug,staffSlug){
