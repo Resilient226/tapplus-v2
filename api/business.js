@@ -66,10 +66,13 @@ module.exports = async function handler(req, res) {
       const d = doc.data();
       return ok(res, {
         business: {
-          id:       doc.id,
-          name:     d.name,
-          slug:     d.slug,
-          branding: d.branding || {},
+          id:            doc.id,
+          name:          d.name,
+          slug:          d.slug,
+          branding:      d.branding || {},
+          platformLinks: d.platformLinks || [],
+          reviewLinks:   d.reviewLinks || [],
+          links:         d.links || [],
         }
       });
     }
@@ -141,9 +144,11 @@ module.exports = async function handler(req, res) {
           instagram: false, tiktok: false, custom: false,
         },
       },
-      links:     [],
-      teamGoals: [],
-      createdAt: Date.now(),
+      platformLinks: [],
+      reviewLinks:   [],
+      links:         [],
+      teamGoals:     [],
+      createdAt:     Date.now(),
     };
 
     const ref = await db.collection(COL).add(bizData);
@@ -172,7 +177,8 @@ module.exports = async function handler(req, res) {
     const body    = req.body || {};
     const updates = {};
 
-    const allowed = ['name', 'branding', 'links', 'teamGoals'];
+    // ── FIXED: platformLinks and reviewLinks are now allowed ──
+    const allowed = ['name', 'branding', 'links', 'teamGoals', 'platformLinks', 'reviewLinks'];
     for (const key of allowed) {
       if (body[key] !== undefined) updates[key] = body[key];
     }
