@@ -18,9 +18,14 @@ module.exports = async function handler(req, res) {
 
   // ── GET — public, any session ────────────────────────────────────────────
   if (req.method === 'GET') {
-    const doc = await DOC.get();
-    const layouts = doc.exists ? doc.data() : DEFAULT_LAYOUTS;
-    return ok(res, { layouts });
+    try {
+      const doc = await DOC.get();
+      const layouts = doc.exists ? doc.data() : DEFAULT_LAYOUTS;
+      return ok(res, { layouts });
+    } catch (e) {
+      console.error('Layout GET error:', e.message);
+      return err(res, 'Database error: ' + e.message, 500);
+    }
   }
 
   // ── PUT — superAdmin only ────────────────────────────────────────────────
