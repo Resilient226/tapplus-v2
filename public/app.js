@@ -366,7 +366,6 @@ function renderDashboard(){
     window._pStar=function(r){
       for(var i=1;i<=5;i++){var el=document.getElementById('pcs'+i);if(el){el.style.filter=i<=r?'none':'grayscale(1)';el.style.opacity=i<=r?'1':'.3';}}
       var after=document.getElementById('p-after');if(!after)return;
-      if(r>=4&&links.length){
       if(r>=4){
         var rp=esc(b.reviewPrompt||"Share your experience!");
         var linkHtml=links.length?links.map(function(l){return '<div style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px 16px;margin-bottom:10px"><div style="width:42px;height:42px;border-radius:12px;background:rgba(0,229,160,.1);display:flex;align-items:center;justify-content:center;font-size:20px">⭐</div><div style="flex:1;font-weight:700">'+esc(l.label||l.platform)+'</div></div>';}).join(""):"<div style='padding:16px;text-align:center;color:rgba(238,240,248,.5);font-size:14px'>No review links configured yet</div>";
@@ -1059,5 +1058,4 @@ async function renderTapPage(bizSlug,staffSlug){
       ${bulletinLinks.length?`<div style="width:100%;margin-top:8px"><div style="font-size:10px;font-weight:700;opacity:.3;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;text-align:center">${esc(b.name)}</div>${bulletinLinks.map(l=>linkRow(l)).join('')}</div>`:''}
     </div>
     <div style="position:fixed;bottom:10px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.08;pointer-events:none">POWERED BY TAP+</div>`;
-}
 }
