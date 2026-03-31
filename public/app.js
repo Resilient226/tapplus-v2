@@ -263,9 +263,9 @@ function renderDashboard(){
   const {session:sess,biz,staff,taps,layout}=State;
   const role=sess?.role;
   const me=role==='staff'?staff.find(s=>s.id===sess?.staffId):null;
-  const defaults={staff:['coaching','feedback','goals','stats','branding'],manager:['ai','team','staff','goals','estimator','settings'],bizAdmin:['ai','team','staff','goals','settings']};
+  const defaults={staff:['coaching','feedback','goals','stats','branding'],manager:['ai','team','staff','goals','estimator','branding2'],bizAdmin:['ai','team','staff','goals','branding2']};
   const sections=layout?.[role]||defaults[role]||defaults.staff;
-  const LABELS={coaching:'🤖 Coaching',feedback:'💬 Feedback',goals:'🎯 Goals',stats:'📊 Stats',branding:'✨ Branding',ai:'🤖 AI Insights',team:'🏆 Team',staff:'👥 Staff',links:'🔗 Links',estimator:'📈 Estimator',settings:'⚙️ Settings'};
+  const LABELS={coaching:'🤖 Coaching',feedback:'💬 Feedback',goals:'🎯 Goals',stats:'📊 Stats',branding:'✨ Branding',ai:'🤖 AI Insights',team:'🏆 Team',staff:'👥 Staff',links:'🔗 Links',estimator:'📈 Estimator',settings:'⚙️ Settings',branding2:'🎨 Branding'};
   let active=sections[0];
 
   app().innerHTML=`
@@ -301,6 +301,7 @@ function renderDashboard(){
       case 'staff':     renderStaffTab(body);break;
       case 'estimator': body.innerHTML=renderEstimatorTab();break;
       case 'settings':  renderSettingsTab(body);break;
+      case 'branding2': renderSettingsTab(body);break;
       default:          body.innerHTML=`<div style="color:var(--gray);text-align:center;padding:40px">Coming soon</div>`;
     }
   };
@@ -870,127 +871,221 @@ function renderEstimatorTab(){
   </div>`;
 }
 
-// ── Settings Tab (bizAdmin) ───────────────────────────────────────────────────
+// ── Branding & Settings Tab (bizAdmin) ───────────────────────────────────────
 function renderSettingsTab(body) {
   const biz = State.biz;
   const b   = biz?.branding || {};
   const platformLinks = biz?.platformLinks || [];
   let reviewLinks = [...(biz?.reviewLinks || [])];
+  let bulletinLinks = [...(b.bulletinLinks || [])];
   let dragIdx = null;
 
   function availablePlatforms() {
     const added = new Set(reviewLinks.map(l => l.platform));
     return platformLinks.filter(p => p.enabled && !added.has(p.platform));
   }
-
-  function _platformIcon(platform) {
-    const icons = { google:'🔍', yelp:'⭐', tripadvisor:'🦉', opentable:'🍽️', facebook:'👍', custom:'🔗' };
-    return icons[(platform||'').toLowerCase()] || '🔗';
+  function _platIcon(p) {
+    return {google:'🔍',yelp:'⭐',tripadvisor:'🦉',opentable:'🍽️',facebook:'👍',custom:'🔗'}[(p||'').toLowerCase()]||'🔗';
   }
 
   function draw() {
     const avail = availablePlatforms();
     body.innerHTML = `
-      <div class="plain-card">
-        <div style="font-weight:700;font-size:15px;margin-bottom:4px">⚙️ Settings</div>
-        <div style="font-size:12px;color:var(--gray);margin-bottom:16px">Store code, rating question, messages</div>
-        <div style="background:#0e0f15;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;text-align:center">
-          <div class="field-lbl">Store Code</div>
-          <div style="font-size:32px;font-weight:900;letter-spacing:.2em;color:var(--green)">${esc(biz?.storeCode)}</div>
-          <div style="font-size:12px;color:var(--gray);margin-top:4px">Staff use this to log in</div>
+      <div class="plain-card" style="margin-bottom:10px">
+        <div style="font-weight:700;font-size:15px;margin-bottom:16px">🎨 Branding</div>
+
+        <div class="field-lbl">Business Name</div>
+        <input class="inp" id="s-name" value="${esc(b.name||biz?.name||'')}" style="margin-bottom:10px"/>
+        <div class="field-lbl">Tagline</div>
+        <input class="inp" id="s-tag" value="${esc(b.tagline||'')}" placeholder="We Create Memories" style="margin-bottom:10px"/>
+
+        <div class="field-lbl">Logo URL or Upload</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input class="inp" id="s-logo" value="${esc(b.logoUrl||'')}" placeholder="https://…" style="flex:1"/>
+          <button onclick="window._pickLogo()" class="btn btn-ghost btn-sm">📷</button>
         </div>
+        ${b.logoUrl?`<img src="${esc(b.logoUrl)}" id="s-logo-prev" style="height:48px;object-fit:contain;border-radius:8px;margin-bottom:10px;display:block"/>`:''}
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+          <div><div class="field-lbl">Brand</div><input type="color" id="s-bc" value="${esc(b.brandColor||'#00e5a0')}" style="width:100%;height:42px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;padding:2px"/></div>
+          <div><div class="field-lbl">Background</div><input type="color" id="s-bg" value="${esc(b.bgColor||'#07080c')}" style="width:100%;height:42px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;padding:2px"/></div>
+          <div><div class="field-lbl">Text</div><input type="color" id="s-tc" value="${esc(b.textColor||'#ffffff')}" style="width:100%;height:42px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;padding:2px"/></div>
+        </div>
+
         <div class="field-lbl">Rating Question</div>
         <input class="inp" id="s-q" value="${esc(b.ratingQuestion||'How was your experience today?')}" style="margin-bottom:10px"/>
+        <div class="field-lbl">5★ Review Prompt</div>
+        <input class="inp" id="s-rp" value="${esc(b.reviewPrompt||'Share your experience!')}" style="margin-bottom:10px"/>
+        <div class="field-lbl">Thank You (shown after 5★ before redirect)</div>
+        <input class="inp" id="s-ty" value="${esc(b.thankYouMsg||'Thank you! Redirecting you now…')}" style="margin-bottom:10px"/>
         <div class="field-lbl">Low Rating Message</div>
         <input class="inp" id="s-lr" value="${esc(b.lowRatingMsg||"We're sorry to hear that.")}" style="margin-bottom:10px"/>
-        <div class="field-lbl">Thank You (shown after 5★ before redirect)</div>
-        <input class="inp" id="s-ty" value="${esc(b.thankYouMsg||'Thank you! Redirecting you now\u2026')}" style="margin-bottom:20px"/>
+      </div>
+
+      <div class="plain-card" style="margin-bottom:10px">
         <div style="font-weight:700;font-size:15px;margin-bottom:4px">⭐ Review Links</div>
-        <div style="font-size:12px;color:var(--gray);margin-bottom:14px">
-          First link = 5★ auto-redirect · 4★ shows all links · Drag to reorder
-        </div>
+        <div style="font-size:12px;color:var(--gray);margin-bottom:14px">First = 5★ auto-redirect · 4★ shows all · Drag to reorder</div>
         <div id="rl-list" style="margin-bottom:12px">
-          ${reviewLinks.length === 0
-            ? `<div style="background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1);border-radius:12px;padding:20px;text-align:center;color:var(--gray);font-size:13px">No review links added yet.<br/>Tap + to add platforms.</div>`
-            : reviewLinks.map((l, i) => `
-              <div draggable="true"
-                ondragstart="window._rlDragStart(${i})"
-                ondragover="event.preventDefault()"
-                ondrop="window._rlDrop(${i})"
+          ${reviewLinks.length===0
+            ? `<div style="background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1);border-radius:12px;padding:20px;text-align:center;color:var(--gray);font-size:13px">No review links yet. Tap + to add.</div>`
+            : reviewLinks.map((l,i)=>`
+              <div draggable="true" ondragstart="window._rlDs(${i})" ondragover="event.preventDefault()" ondrop="window._rlDr(${i})"
                 style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border:1px solid ${i===0?'rgba(0,229,160,.3)':'rgba(255,255,255,.07)'};border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:grab">
-                <div style="font-size:18px;color:rgba(238,240,248,.25);user-select:none">⠿</div>
+                <div style="font-size:16px;color:rgba(238,240,248,.2);user-select:none">⠿</div>
                 <div style="flex:1;min-width:0">
-                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                    <div style="font-weight:700;font-size:14px">${esc(l.label||l.platform)}</div>
-                    ${i===0?`<span style="background:rgba(0,229,160,.15);color:#00e5a0;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;border:1px solid rgba(0,229,160,.3)">5★ REDIRECT</span>`:''}
+                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                    <span style="font-size:16px">${_platIcon(l.platform)}</span>
+                    <span style="font-weight:700;font-size:14px">${esc(l.label||l.platform)}</span>
+                    ${i===0?`<span style="background:rgba(0,229,160,.15);color:#00e5a0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;border:1px solid rgba(0,229,160,.3)">5★ REDIRECT</span>`:''}
                   </div>
                   <div style="font-size:11px;color:var(--gray);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.url)}</div>
                 </div>
-                <button onclick="window._rlRemove(${i})" style="background:rgba(255,68,85,.08);border:1px solid rgba(255,68,85,.2);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;color:var(--red);cursor:pointer;font-family:'Nunito',sans-serif;flex-shrink:0">✕</button>
+                <button onclick="window._rlRm(${i})" style="background:rgba(255,68,85,.08);border:1px solid rgba(255,68,85,.2);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;color:var(--red);cursor:pointer;font-family:'Nunito',sans-serif;flex-shrink:0">✕</button>
               </div>`).join('')
           }
         </div>
-        ${avail.length > 0
-          ? `<button onclick="window._rlAdd()" class="btn btn-ghost btn-full" style="margin-bottom:16px">+ Add Review Platform</button>`
-          : platformLinks.length === 0
-            ? `<div style="background:rgba(255,165,0,.06);border:1px solid rgba(255,165,0,.2);border-radius:10px;padding:12px;font-size:12px;color:rgba(255,165,0,.8);margin-bottom:16px;text-align:center">No platforms configured — contact your administrator.</div>`
-            : `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px;font-size:12px;color:var(--gray);margin-bottom:16px;text-align:center">All available platforms added.</div>`
+        ${avail.length>0
+          ? `<button onclick="window._rlAdd()" class="btn btn-ghost btn-full" style="margin-bottom:4px">+ Add Review Platform</button>`
+          : platformLinks.length===0
+            ? `<div style="background:rgba(255,165,0,.06);border:1px solid rgba(255,165,0,.2);border-radius:10px;padding:12px;font-size:12px;color:rgba(255,165,0,.8);text-align:center">No platforms configured — contact your administrator.</div>`
+            : `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px;font-size:12px;color:var(--gray);text-align:center">All available platforms added.</div>`
         }
-        <button onclick="window._saveSettings()" class="btn btn-primary btn-full">Save Settings</button>
-      </div>`;
+      </div>
 
-    window._rlDragStart = function(i) { dragIdx = i; };
-    window._rlDrop = function(toIdx) {
-      if (dragIdx === null || dragIdx === toIdx) return;
-      const moved = reviewLinks.splice(dragIdx, 1)[0];
-      reviewLinks.splice(toIdx, 0, moved);
-      dragIdx = null;
-      draw();
-    };
-    window._rlRemove = function(i) { reviewLinks.splice(i, 1); draw(); };
-    window._rlAdd = function() {
-      const avail2 = availablePlatforms();
-      showModal(`
-        <div class="modal-head">
-          <div class="modal-title">Add Review Platform</div>
-          <button class="modal-close" onclick="closeModal()">×</button>
+      <div class="plain-card" style="margin-bottom:10px">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">📌 Bulletin Board</div>
+        <div style="font-size:12px;color:var(--gray);margin-bottom:12px">Extra links shown on every tap page</div>
+        <div id="s-bulletin" style="margin-bottom:8px"></div>
+        <button class="btn btn-ghost btn-full" onclick="window._addBull()">+ Add Bulletin Item</button>
+      </div>
+
+      <div class="plain-card" style="margin-bottom:10px">
+        <div class="field-lbl">Staff Can Add</div>
+        <div style="border-radius:12px;padding:4px 0">
+          ${['spotify','phone','email','instagram','tiktok','custom'].map(t=>{
+            const TL={spotify:'🎵 Spotify',phone:'📞 Phone',email:'✉️ Email',instagram:'📸 Instagram',tiktok:'🎵 TikTok',custom:'🔗 Custom'};
+            const on=(b.allowedStaffLinks||{})[t];
+            return`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px;font-weight:600">${TL[t]}</span><div class="toggle${on?' on':''}" id="tog-${t}" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div></div>`;
+          }).join('')}
         </div>
+      </div>
+
+      <div style="background:#0e0f15;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;text-align:center">
+        <div class="field-lbl">Store Code</div>
+        <div style="font-size:32px;font-weight:900;letter-spacing:.2em;color:var(--green)">${esc(biz?.storeCode)}</div>
+        <div style="font-size:12px;color:var(--gray);margin-top:4px">Staff use this to log in</div>
+      </div>
+
+      <button onclick="window._saveBranding()" class="btn btn-primary btn-full">Save Branding</button>`;
+
+    // Bulletin board
+    function drawBulletin(){
+      const el=$('s-bulletin');if(!el)return;
+      el.innerHTML=bulletinLinks.length?bulletinLinks.map((l,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;background:#15171f;border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700">${esc(l.label)}</div>
+            ${l.url?`<div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.url)}</div>`:''}
+          </div>
+          <button onclick="window._rmBull(${i})" style="background:rgba(255,68,85,.08);border:1px solid rgba(255,68,85,.2);border-radius:7px;padding:4px 8px;font-size:11px;font-weight:700;color:var(--red);cursor:pointer;font-family:'Nunito',sans-serif">✕</button>
+        </div>`).join(''):`<div style="font-size:12px;color:var(--gray);margin-bottom:8px">No items yet.</div>`;
+    }
+    drawBulletin();
+
+    // Drag handlers for review links
+    window._rlDs = function(i){ dragIdx=i; };
+    window._rlDr = function(toIdx){
+      if(dragIdx===null||dragIdx===toIdx)return;
+      const moved=reviewLinks.splice(dragIdx,1)[0];
+      reviewLinks.splice(toIdx,0,moved);
+      dragIdx=null; draw();
+    };
+    window._rlRm = function(i){ reviewLinks.splice(i,1); draw(); };
+    window._rlAdd = function(){
+      const avail2=availablePlatforms();
+      showModal(`
+        <div class="modal-head"><div class="modal-title">Add Review Platform</div><button class="modal-close" onclick="closeModal()">×</button></div>
         <div style="display:flex;flex-direction:column;gap:10px">
-          ${avail2.map((p, i) => `
+          ${avail2.map((p,i)=>`
             <button onclick="window._rlPick(${i})"
               style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px 16px;cursor:pointer;text-align:left;font-family:'Nunito',sans-serif;width:100%">
-              <div style="font-size:22px">${_platformIcon(p.platform)}</div>
+              <div style="font-size:24px">${_platIcon(p.platform)}</div>
               <div style="min-width:0">
                 <div style="font-weight:700;font-size:14px;color:#eef0f8">${esc(p.label||p.platform)}</div>
                 <div style="font-size:11px;color:rgba(238,240,248,.35);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">${esc(p.url)}</div>
               </div>
             </button>`).join('')}
         </div>`);
-      window._rlPick = function(i) {
-        const p = avail2[i];
-        reviewLinks.push({ platform: p.platform, label: p.label || p.platform, url: p.url });
-        closeModal();
-        draw();
+      window._rlPick=function(i){
+        const p=avail2[i];
+        reviewLinks.push({platform:p.platform,label:p.label||p.platform,url:p.url});
+        closeModal(); draw();
       };
     };
+
+    // Bulletin handlers
+    window._rmBull=function(i){bulletinLinks.splice(i,1);drawBulletin();};
+    window._addBull=function(){
+      showModal(`
+        <div class="modal-head"><div class="modal-title">Add Bulletin Item</div><button class="modal-close" onclick="closeModal()">×</button></div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div><div class="field-lbl">Type</div><select class="sel" id="bl-t" onchange="window._blTog(this.value)"><option value="custom">🔗 Link</option><option value="text">📝 Text Only</option><option value="spotify">🎵 Spotify</option></select></div>
+          <div><div class="field-lbl">Title</div><input class="inp" id="bl-l" placeholder="e.g. Happy Hour 4-6pm"/></div>
+          <div id="bl-uw"><div class="field-lbl">URL</div><input class="inp" id="bl-u" placeholder="https://…"/></div>
+          <div><div class="field-lbl">Description (optional)</div><input class="inp" id="bl-s" placeholder="More details…"/></div>
+          <button class="btn btn-primary btn-full" onclick="window._doAddBull()">Add</button>
+        </div>`);
+      window._blTog=function(t){const w=$('bl-uw');if(w)w.style.display=t==='text'?'none':'block';};
+      window._doAddBull=function(){
+        const type=$('bl-t')?.value||'custom',label=$('bl-l')?.value?.trim()||'';
+        let url=$('bl-u')?.value?.trim()||'';const sub=$('bl-s')?.value?.trim()||'';
+        if(!label){showToast('Title required');return;}
+        if(type!=='text'&&!url){showToast('URL required');return;}
+        if(url&&!url.startsWith('http'))url='https://'+url;
+        bulletinLinks.push({type,label,url,sublabel:sub});closeModal();drawBulletin();showToast('Added ✓');
+      };
+    };
+
+    // Logo upload
+    window._pickLogo=function(){
+      const i=document.createElement('input');i.type='file';i.accept='image/*';
+      i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+        r.onload=ev=>{window._logoData=ev.target.result;const li=$('s-logo');if(li)li.value='';
+          let p=$('s-logo-prev');if(!p){p=document.createElement('img');p.id='s-logo-prev';
+            p.style='height:48px;object-fit:contain;border-radius:8px;margin-bottom:10px;display:block';
+            $('s-logo').parentNode.insertAdjacentElement('afterend',p);}p.src=ev.target.result;};
+        r.readAsDataURL(f);};i.click();};
   }
 
-  window._saveSettings = async function() {
-    const updates = {
+  window._saveBranding = async function(){
+    const allowed={};
+    ['spotify','phone','email','instagram','tiktok','custom'].forEach(t=>{allowed[t]=!!$('tog-'+t)?.classList.contains('on');});
+    const logoUrl=window._logoData||$('s-logo')?.value?.trim()||b.logoUrl||'';
+    const updates={
       reviewLinks,
-      branding: {
+      branding:{
         ...b,
-        ratingQuestion: $('s-q')?.value?.trim() || b.ratingQuestion,
-        lowRatingMsg:   $('s-lr')?.value?.trim() || b.lowRatingMsg,
-        thankYouMsg:    $('s-ty')?.value?.trim() || b.thankYouMsg,
+        name:        $('s-name')?.value?.trim()||b.name,
+        tagline:     $('s-tag')?.value?.trim()||'',
+        logoUrl,
+        brandColor:  $('s-bc')?.value||'#00e5a0',
+        bgColor:     $('s-bg')?.value||'#07080c',
+        textColor:   $('s-tc')?.value||'#ffffff',
+        ratingQuestion: $('s-q')?.value?.trim()||b.ratingQuestion,
+        reviewPrompt:   $('s-rp')?.value?.trim()||b.reviewPrompt,
+        thankYouMsg:    $('s-ty')?.value?.trim()||b.thankYouMsg,
+        lowRatingMsg:   $('s-lr')?.value?.trim()||b.lowRatingMsg,
+        bulletinLinks,
+        allowedStaffLinks: allowed,
       }
     };
-    try {
-      const d = await API.business.update(State.session.bizId, updates);
-      State.biz = { ...State.biz, ...d.business };
-      showToast('Settings saved ✓');
+    try{
+      const d=await API.business.update(State.session.bizId,updates);
+      State.biz={...State.biz,...d.business};
+      window._logoData=undefined;
+      showToast('Branding saved ✓');
       draw();
-    } catch(e) { showToast(e.message || 'Save failed'); }
+    }catch(e){showToast(e.message||'Save failed');}
   };
 
   draw();
@@ -1036,8 +1131,8 @@ function renderSuperAdminDashboard(){
     $('sa-body').innerHTML=`<div style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></div>`;
     API.layout.get().then(data=>{
       const L=data.layouts;
-      const SECTIONS={staff:['coaching','feedback','goals','stats','branding'],manager:['ai','team','staff','links','goals','estimator'],bizAdmin:['ai','team','staff','links','goals','branding','settings']};
-      const SLABELS={coaching:'🤖 Coaching',feedback:'💬 Feedback',goals:'🎯 Goals',stats:'📊 Stats',branding:'✨ Branding',ai:'🤖 AI Insights',team:'🏆 Team',staff:'👥 Staff',links:'🔗 Links',estimator:'📈 Estimator',settings:'⚙️ Settings'};
+      const SECTIONS={staff:['coaching','feedback','goals','stats','branding'],manager:['ai','team','staff','goals','estimator','branding2'],bizAdmin:['ai','team','staff','goals','branding2']};
+      const SLABELS={coaching:'🤖 Coaching',feedback:'💬 Feedback',goals:'🎯 Goals',stats:'📊 Stats',branding:'✨ Branding',ai:'🤖 AI Insights',team:'🏆 Team',staff:'👥 Staff',links:'🔗 Links',estimator:'📈 Estimator',settings:'⚙️ Settings',branding2:'🎨 Branding'};
       const layouts={staff:[...(L.staff||SECTIONS.staff)],manager:[...(L.manager||SECTIONS.manager)],bizAdmin:[...(L.bizAdmin||SECTIONS.bizAdmin)]};
       function drawLayouts(){
         $('sa-body').innerHTML=Object.entries(layouts).map(([role,order])=>`
