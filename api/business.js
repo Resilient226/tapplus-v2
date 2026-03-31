@@ -74,6 +74,22 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // List all businesses (superAdmin only)
+    if (req.query.listAll) {
+      const session = getSession(req);
+      const guard = requireRole(session, 'superAdmin');
+      if (guard) return err(res, guard.error, guard.status);
+
+      try {
+        const snap = await db.collection(COL).orderBy('createdAt', 'desc').get();
+        const businesses = snap.docs.map(d => sanitize(d.id, d.data()));
+        return ok(res, { businesses });
+      } catch (e) {
+        console.error('Business listAll error:', e.message);
+        return err(res, 'Database error: ' + e.message, 500);
+      }
+    }
+
     return err(res, 'Provide slug, code, or id');
   }
 

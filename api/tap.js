@@ -79,17 +79,34 @@ module.exports = async function handler(req, res) {
       return err(res, 'Forbidden', 403);
     }
 
-    let query = db.collection('taps').where('bizId', '==', bizId);
+    try {
+      let query = db.collection('taps').where('bizId', '==', bizId);
 
-    if (staffId) query = query.where('staffId', '==', staffId);
-    if (from)    query = query.where('ts', '>=', parseInt(from));
-    if (to)      query = query.where('ts', '<=', parseInt(to));
+      if (staffId) query = query.where('staffId', '==', staffId);
+      if (from)    query = query.where('ts', '>=', parseInt(from));
+      if (to)      query = query.where('ts', '<=', parseInt(to));
 
-    query = query.orderBy('ts', 'desc').limit(parseInt(lim) || 500);
+      query = query.orderBy('ts', 'desc').limit(parseInt(lim) || 500);
 
-    const snap = await query.get();
-    const taps = snap.docs.map(d => d.data());
-    return ok(res, { taps });
+      const snap = await query.get();
+      const taps = snap.docs.map(d => d.data());
+      return ok(res, { taps });
+    } catch (e) {
+      console.error('Taps GET error:', e.message);
+      // Firestore composite index missing — retry without orderBy
+      if (e.code === 9 || e.message.includes('index')) {
+        try {
+          let query = db.collection('taps').where('bizId', '==', bizId);
+          if (staffId) query = query.where('staffId', '==', staffId);
+          const snap = await query.limit(parseInt(lim) || 500).get();
+          const taps = snap.docs.map(d => d.data()).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+          return ok(res, { taps });
+        } catch (e2) {
+          return err(res, 'Database error: ' + e2.message, 500);
+        }
+      }
+      return err(res, 'Database error: ' + e.message, 500);
+    }
   }
 
   return err(res, 'Method not allowed', 405);
