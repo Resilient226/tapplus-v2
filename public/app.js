@@ -263,7 +263,7 @@ function renderDashboard(){
   const {session:sess,biz,staff,taps,layout}=State;
   const role=sess?.role;
   const me=role==='staff'?staff.find(s=>s.id===sess?.staffId):null;
-  const defaults={staff:['coaching','feedback','goals','stats','branding'],manager:['ai','team','staff','links','goals','estimator'],bizAdmin:['ai','team','staff','links','goals','branding','settings']};
+  const defaults={staff:['coaching','feedback','goals','stats','branding'],manager:['ai','team','staff','goals','estimator','settings'],bizAdmin:['ai','team','staff','goals','settings']};
   const sections=layout?.[role]||defaults[role]||defaults.staff;
   const LABELS={coaching:'🤖 Coaching',feedback:'💬 Feedback',goals:'🎯 Goals',stats:'📊 Stats',branding:'✨ Branding',ai:'🤖 AI Insights',team:'🏆 Team',staff:'👥 Staff',links:'🔗 Links',estimator:'📈 Estimator',settings:'⚙️ Settings'};
   let active=sections[0];
@@ -299,7 +299,6 @@ function renderDashboard(){
       case 'ai':        renderAITab(body);break;
       case 'team':      renderTeamTab(body);break;
       case 'staff':     renderStaffTab(body);break;
-      case 'links':     renderLinksTab(body);break;
       case 'estimator': body.innerHTML=renderEstimatorTab();break;
       case 'settings':  renderSettingsTab(body);break;
       default:          body.innerHTML=`<div style="color:var(--gray);text-align:center;padding:40px">Coming soon</div>`;
@@ -844,31 +843,6 @@ function renderStaffTab(body){
   draw();
 }
 
-// ── Links Tab ─────────────────────────────────────────────────────────────────
-function renderLinksTab(body){
-  const biz=State.biz;
-  let links=[...(biz?.links||[])];
-  function draw(){
-    body.innerHTML=`<div class="sec-lbl">Review Links</div>
-    <div style="font-size:12px;color:var(--gray);margin-bottom:12px">4-5★ ratings redirect here</div>
-    ${links.map((l,i)=>`<div class="plain-card" style="display:flex;align-items:center;gap:12px"><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px">${esc(l.label||l.platform)}</div><div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.url)}</div></div><button onclick="window._rmL(${i})" style="background:rgba(255,68,85,.08);border:1px solid rgba(255,68,85,.2);border-radius:7px;padding:5px 9px;font-size:11px;font-weight:700;color:var(--red);cursor:pointer;font-family:'Nunito',sans-serif">✕</button></div>`).join('')}
-    <button class="btn btn-ghost btn-full" onclick="window._addL()" style="margin-top:4px">+ Add Link</button>
-    <button class="btn btn-primary btn-full" onclick="window._saveL()" style="margin-top:8px">Save Links</button>`;
-  }
-  window._rmL=function(i){links.splice(i,1);draw();};
-  window._addL=function(){
-    showModal(`<div class="modal-head"><div class="modal-title">Add Review Link</div><button class="modal-close" onclick="closeModal()">×</button></div>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div><div class="field-lbl">Platform</div><select class="sel" id="al-p"><option>Google</option><option>Yelp</option><option>TripAdvisor</option><option>OpenTable</option><option>Custom</option></select></div>
-        <div><div class="field-lbl">Label</div><input class="inp" id="al-l" placeholder="Review us on Google"/></div>
-        <div><div class="field-lbl">URL</div><input class="inp" id="al-u" placeholder="https://g.page/…"/></div>
-        <button class="btn btn-primary btn-full" onclick="window._doAddL()">Add</button>
-      </div>`);
-    window._doAddL=function(){const p=$('al-p')?.value||'Google',l=$('al-l')?.value?.trim()||p;let u=$('al-u')?.value?.trim()||'';if(!u){showToast('Enter URL');return;}if(!u.startsWith('http'))u='https://'+u;links.push({platform:p,label:l,url:u});closeModal();draw();};
-  };
-  window._saveL=async function(){try{const d=await API.business.update(State.session.bizId,{links});State.biz={...State.biz,links:d.business.links};showToast('Saved ✓');draw();}catch(e){showToast(e.message||'Failed');draw();}};
-  draw();
-}
 
 // ── Estimator Tab ─────────────────────────────────────────────────────────────
 function renderEstimatorTab(){
@@ -896,73 +870,132 @@ function renderEstimatorTab(){
   </div>`;
 }
 
-// ── Settings Tab ──────────────────────────────────────────────────────────────
-function renderSettingsTab(body){
-  const b=State.biz?.branding||{};
-  let bulletinLinks=[...(b.bulletinLinks||[])];
-  body.innerHTML=`<div class="plain-card">
-    <div style="font-weight:700;font-size:15px;margin-bottom:16px">🎨 Branding & Settings</div>
-    <div class="field-lbl">Business Name</div><input class="inp" id="s-name" value="${esc(b.name||State.biz?.name)}" style="margin-bottom:10px"/>
-    <div class="field-lbl">Tagline</div><input class="inp" id="s-tag" value="${esc(b.tagline||'')}" placeholder="We Create Memories" style="margin-bottom:10px"/>
-    <div class="field-lbl">Logo URL or Upload</div>
-    <div style="display:flex;gap:8px;margin-bottom:10px"><input class="inp" id="s-logo" value="${esc(b.logoUrl||'')}" placeholder="https://…" style="flex:1"/><button onclick="window._pickLogo()" class="btn btn-ghost btn-sm">📷</button></div>
-    ${b.logoUrl?`<img src="${esc(b.logoUrl)}" id="s-logo-prev" style="height:48px;object-fit:contain;border-radius:8px;margin-bottom:10px;display:block"/>`:''}
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
-      <div><div class="field-lbl">Brand</div><input type="color" id="s-bc" value="${esc(b.brandColor||'#00e5a0')}" style="width:100%;height:42px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;padding:2px"/></div>
-      <div><div class="field-lbl">Background</div><input type="color" id="s-bg" value="${esc(b.bgColor||'#07080c')}" style="width:100%;height:42px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;padding:2px"/></div>
-      <div><div class="field-lbl">Text</div><input type="color" id="s-tc" value="${esc(b.textColor||'#ffffff')}" style="width:100%;height:42px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;padding:2px"/></div>
-    </div>
-    <div class="field-lbl">Rating Question</div><input class="inp" id="s-q" value="${esc(b.ratingQuestion||'How was your experience today?')}" style="margin-bottom:10px"/>
-    <div class="field-lbl">5★ Prompt</div><input class="inp" id="s-rp" value="${esc(b.reviewPrompt||'')}" style="margin-bottom:10px"/>
-    <div class="field-lbl">Thank You Message</div><input class="inp" id="s-ty" value="${esc(b.thankYouMsg||'')}" style="margin-bottom:10px"/>
-    <div class="field-lbl">Low Rating Message</div><input class="inp" id="s-lr" value="${esc(b.lowRatingMsg||'')}" style="margin-bottom:16px"/>
-    <div class="sec-lbl">Bulletin Board</div>
-    <div style="font-size:12px;color:var(--gray);margin-bottom:10px;line-height:1.5">Links shown on every staff tap page</div>
-    <div id="s-bulletin" style="margin-bottom:8px"></div>
-    <button class="btn btn-ghost btn-full" onclick="window._addBull()" style="margin-bottom:16px">+ Add Bulletin Item</button>
-    <div class="sec-lbl">Staff Can Add</div>
-    <div style="background:#0e0f15;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px">
-      ${['spotify','phone','email','instagram','tiktok','custom'].map(t=>{const TL={spotify:'🎵 Spotify',phone:'📞 Phone',email:'✉️ Email',instagram:'📸 Instagram',tiktok:'🎵 TikTok',custom:'🔗 Custom'};const on=(b.allowedStaffLinks||{})[t];return`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px;font-weight:600">${TL[t]}</span><div class="toggle${on?' on':''}" id="tog-${t}" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div></div>`;}).join('')}
-    </div>
-    <div style="background:#0e0f15;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;text-align:center">
-      <div class="field-lbl">Store Code</div>
-      <div style="font-size:32px;font-weight:900;letter-spacing:.2em;color:var(--green)">${esc(State.biz?.storeCode)}</div>
-      <div style="font-size:12px;color:var(--gray);margin-top:4px">Staff use this to log in</div>
-    </div>
-    <button class="btn btn-primary btn-full" onclick="window._saveSetting()">Save Settings</button>
-  </div>`;
-  function drawBulletin(){
-    const el=$('s-bulletin');if(!el)return;
-    el.innerHTML=bulletinLinks.length?bulletinLinks.map((l,i)=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;background:#15171f;border:1px solid var(--border);border-radius:10px;padding:10px 12px"><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(l.label)}</div>${l.url?`<div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.url)}</div>`:''}</div><button onclick="window._rmBull(${i})" style="background:rgba(255,68,85,.08);border:1px solid rgba(255,68,85,.2);border-radius:7px;padding:4px 8px;font-size:11px;font-weight:700;color:var(--red);cursor:pointer;font-family:'Nunito',sans-serif">✕</button></div>`).join(''):`<div style="font-size:12px;color:var(--gray);margin-bottom:8px">No items yet.</div>`;
+// ── Settings Tab (bizAdmin) ───────────────────────────────────────────────────
+function renderSettingsTab(body) {
+  const biz = State.biz;
+  const b   = biz?.branding || {};
+  const platformLinks = biz?.platformLinks || [];
+  let reviewLinks = [...(biz?.reviewLinks || [])];
+  let dragIdx = null;
+
+  function availablePlatforms() {
+    const added = new Set(reviewLinks.map(l => l.platform));
+    return platformLinks.filter(p => p.enabled && !added.has(p.platform));
   }
-  drawBulletin();
-  window._rmBull=function(i){bulletinLinks.splice(i,1);drawBulletin();};
-  window._addBull=function(){
-    showModal(`<div class="modal-head"><div class="modal-title">Add Bulletin Item</div><button class="modal-close" onclick="closeModal()">×</button></div>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div><div class="field-lbl">Type</div><select class="sel" id="bl-t" onchange="window._blTog(this.value)"><option value="custom">🔗 Link</option><option value="text">📝 Text Only</option><option value="spotify">🎵 Spotify</option></select></div>
-        <div><div class="field-lbl">Title</div><input class="inp" id="bl-l" placeholder="e.g. Happy Hour 4-6pm"/></div>
-        <div id="bl-uw"><div class="field-lbl">URL</div><input class="inp" id="bl-u" placeholder="https://…"/></div>
-        <div><div class="field-lbl">Description (optional)</div><input class="inp" id="bl-s" placeholder="More details…"/></div>
-        <button class="btn btn-primary btn-full" onclick="window._doAddBull()">Add</button>
-      </div>`);
-    window._blTog=function(t){const w=$('bl-uw');if(w)w.style.display=t==='text'?'none':'block';};
-    window._doAddBull=function(){
-      const type=$('bl-t')?.value||'custom',label=$('bl-l')?.value?.trim()||'';let url=$('bl-u')?.value?.trim()||'';const sub=$('bl-s')?.value?.trim()||'';
-      if(!label){showToast('Title required');return;}if(type!=='text'&&!url){showToast('URL required');return;}
-      if(url&&!url.startsWith('http'))url='https://'+url;
-      bulletinLinks.push({type,label,url,sublabel:sub});closeModal();drawBulletin();showToast('Added ✓');
+
+  function _platformIcon(platform) {
+    const icons = { google:'🔍', yelp:'⭐', tripadvisor:'🦉', opentable:'🍽️', facebook:'👍', custom:'🔗' };
+    return icons[(platform||'').toLowerCase()] || '🔗';
+  }
+
+  function draw() {
+    const avail = availablePlatforms();
+    body.innerHTML = `
+      <div class="plain-card">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">⚙️ Settings</div>
+        <div style="font-size:12px;color:var(--gray);margin-bottom:16px">Store code, rating question, messages</div>
+        <div style="background:#0e0f15;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;text-align:center">
+          <div class="field-lbl">Store Code</div>
+          <div style="font-size:32px;font-weight:900;letter-spacing:.2em;color:var(--green)">${esc(biz?.storeCode)}</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:4px">Staff use this to log in</div>
+        </div>
+        <div class="field-lbl">Rating Question</div>
+        <input class="inp" id="s-q" value="${esc(b.ratingQuestion||'How was your experience today?')}" style="margin-bottom:10px"/>
+        <div class="field-lbl">Low Rating Message</div>
+        <input class="inp" id="s-lr" value="${esc(b.lowRatingMsg||"We're sorry to hear that.")}" style="margin-bottom:10px"/>
+        <div class="field-lbl">Thank You (shown after 5★ before redirect)</div>
+        <input class="inp" id="s-ty" value="${esc(b.thankYouMsg||'Thank you! Redirecting you now\u2026')}" style="margin-bottom:20px"/>
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">⭐ Review Links</div>
+        <div style="font-size:12px;color:var(--gray);margin-bottom:14px">
+          First link = 5★ auto-redirect · 4★ shows all links · Drag to reorder
+        </div>
+        <div id="rl-list" style="margin-bottom:12px">
+          ${reviewLinks.length === 0
+            ? `<div style="background:rgba(255,255,255,.03);border:1px dashed rgba(255,255,255,.1);border-radius:12px;padding:20px;text-align:center;color:var(--gray);font-size:13px">No review links added yet.<br/>Tap + to add platforms.</div>`
+            : reviewLinks.map((l, i) => `
+              <div draggable="true"
+                ondragstart="window._rlDragStart(${i})"
+                ondragover="event.preventDefault()"
+                ondrop="window._rlDrop(${i})"
+                style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.04);border:1px solid ${i===0?'rgba(0,229,160,.3)':'rgba(255,255,255,.07)'};border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:grab">
+                <div style="font-size:18px;color:rgba(238,240,248,.25);user-select:none">⠿</div>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <div style="font-weight:700;font-size:14px">${esc(l.label||l.platform)}</div>
+                    ${i===0?`<span style="background:rgba(0,229,160,.15);color:#00e5a0;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;border:1px solid rgba(0,229,160,.3)">5★ REDIRECT</span>`:''}
+                  </div>
+                  <div style="font-size:11px;color:var(--gray);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.url)}</div>
+                </div>
+                <button onclick="window._rlRemove(${i})" style="background:rgba(255,68,85,.08);border:1px solid rgba(255,68,85,.2);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;color:var(--red);cursor:pointer;font-family:'Nunito',sans-serif;flex-shrink:0">✕</button>
+              </div>`).join('')
+          }
+        </div>
+        ${avail.length > 0
+          ? `<button onclick="window._rlAdd()" class="btn btn-ghost btn-full" style="margin-bottom:16px">+ Add Review Platform</button>`
+          : platformLinks.length === 0
+            ? `<div style="background:rgba(255,165,0,.06);border:1px solid rgba(255,165,0,.2);border-radius:10px;padding:12px;font-size:12px;color:rgba(255,165,0,.8);margin-bottom:16px;text-align:center">No platforms configured — contact your administrator.</div>`
+            : `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px;font-size:12px;color:var(--gray);margin-bottom:16px;text-align:center">All available platforms added.</div>`
+        }
+        <button onclick="window._saveSettings()" class="btn btn-primary btn-full">Save Settings</button>
+      </div>`;
+
+    window._rlDragStart = function(i) { dragIdx = i; };
+    window._rlDrop = function(toIdx) {
+      if (dragIdx === null || dragIdx === toIdx) return;
+      const moved = reviewLinks.splice(dragIdx, 1)[0];
+      reviewLinks.splice(toIdx, 0, moved);
+      dragIdx = null;
+      draw();
     };
+    window._rlRemove = function(i) { reviewLinks.splice(i, 1); draw(); };
+    window._rlAdd = function() {
+      const avail2 = availablePlatforms();
+      showModal(`
+        <div class="modal-head">
+          <div class="modal-title">Add Review Platform</div>
+          <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          ${avail2.map((p, i) => `
+            <button onclick="window._rlPick(${i})"
+              style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px 16px;cursor:pointer;text-align:left;font-family:'Nunito',sans-serif;width:100%">
+              <div style="font-size:22px">${_platformIcon(p.platform)}</div>
+              <div style="min-width:0">
+                <div style="font-weight:700;font-size:14px;color:#eef0f8">${esc(p.label||p.platform)}</div>
+                <div style="font-size:11px;color:rgba(238,240,248,.35);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">${esc(p.url)}</div>
+              </div>
+            </button>`).join('')}
+        </div>`);
+      window._rlPick = function(i) {
+        const p = avail2[i];
+        reviewLinks.push({ platform: p.platform, label: p.label || p.platform, url: p.url });
+        closeModal();
+        draw();
+      };
+    };
+  }
+
+  window._saveSettings = async function() {
+    const updates = {
+      reviewLinks,
+      branding: {
+        ...b,
+        ratingQuestion: $('s-q')?.value?.trim() || b.ratingQuestion,
+        lowRatingMsg:   $('s-lr')?.value?.trim() || b.lowRatingMsg,
+        thankYouMsg:    $('s-ty')?.value?.trim() || b.thankYouMsg,
+      }
+    };
+    try {
+      const d = await API.business.update(State.session.bizId, updates);
+      State.biz = { ...State.biz, ...d.business };
+      showToast('Settings saved ✓');
+      draw();
+    } catch(e) { showToast(e.message || 'Save failed'); }
   };
-  window._pickLogo=function(){const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{window._logoData=ev.target.result;const li=$('s-logo');if(li)li.value='';let p=$('s-logo-prev');if(!p){p=document.createElement('img');p.id='s-logo-prev';p.style='height:48px;object-fit:contain;border-radius:8px;margin-bottom:10px;display:block';$('s-logo').parentNode.insertAdjacentElement('afterend',p);}p.src=ev.target.result;};r.readAsDataURL(f);};i.click();};
-  window._saveSetting=async function(){
-    const allowed={};['spotify','phone','email','instagram','tiktok','custom'].forEach(t=>{allowed[t]=!!$('tog-'+t)?.classList.contains('on');});
-    const logoUrl=window._logoData||$('s-logo')?.value?.trim()||b.logoUrl||'';
-    const branding={name:$('s-name')?.value?.trim()||b.name,tagline:$('s-tag')?.value?.trim()||'',logoUrl,brandColor:$('s-bc')?.value||'#00e5a0',bgColor:$('s-bg')?.value||'#07080c',textColor:$('s-tc')?.value||'#ffffff',ratingQuestion:$('s-q')?.value?.trim()||b.ratingQuestion,reviewPrompt:$('s-rp')?.value?.trim()||b.reviewPrompt,thankYouMsg:$('s-ty')?.value?.trim()||b.thankYouMsg,lowRatingMsg:$('s-lr')?.value?.trim()||b.lowRatingMsg,bulletinLinks,allowedStaffLinks:allowed};
-    try{const d=await API.business.update(State.session.bizId,{branding});State.biz={...State.biz,...d.business};window._logoData=undefined;showToast('Settings saved ✓');renderDashboard();}
-    catch(e){showToast(e.message||'Failed');renderSettingsTab($('dash-body'));}
-  };
+
+  draw();
 }
+
 
 // ── Owner Dashboard ───────────────────────────────────────────────────────────
 function renderOwnerDashboard(){
@@ -1028,29 +1061,189 @@ function renderSuperAdminDashboard(){
   window._saT('layout');
 }
 
-async function saBiz(){
-  var body=$('sa-body');if(!body)return;
-  body.innerHTML='<div style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></div>';
-  function draw(businesses){
-    body.innerHTML=`
+async function saBiz() {
+  var body = $('sa-body');
+  if (!body) return;
+  body.innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></div>';
+
+  const PLATFORM_DEFAULTS = [
+    { platform: 'google',      label: 'Google',      url: '' },
+    { platform: 'yelp',        label: 'Yelp',        url: '' },
+    { platform: 'tripadvisor', label: 'TripAdvisor', url: '' },
+    { platform: 'opentable',   label: 'OpenTable',   url: '' },
+    { platform: 'facebook',    label: 'Facebook',    url: '' },
+    { platform: 'custom',      label: 'Custom',      url: '' },
+  ];
+
+  var allBiz = [];
+  try {
+    var saR = await fetch('/api/business?listAll=1', { headers: { 'Authorization': 'Bearer ' + API.auth.getToken() } });
+    var saD = await saR.json();
+    if (saD.businesses) allBiz = saD.businesses;
+  } catch(e) {}
+
+  function draw(businesses) {
+    body.innerHTML = `
       <button class="btn btn-primary btn-full" style="margin-bottom:16px" onclick="window._saCreateBiz()">+ Create New Business</button>
-      <div style="display:flex;gap:8px;margin-bottom:16px"><input class="inp" id="sa-biz-search" placeholder="Search by slug…" style="flex:1" oninput="window._saSearch(this.value)"/></div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <input class="inp" id="sa-biz-search" placeholder="Search by slug…" style="flex:1" oninput="window._saSearch(this.value)"/>
+      </div>
       <div id="sa-biz-list">
-        ${businesses.length===0?'<div class="card" style="text-align:center;color:var(--gray);padding:30px">No businesses yet.</div>':
-          businesses.map(b=>`<div class="plain-card" style="display:flex;align-items:center;gap:12px"><div style="flex:1;min-width:0"><div style="font-weight:700">${esc(b.name)}</div><div style="font-size:12px;color:var(--gray)">Code: <span style="color:var(--green);font-weight:700">${esc(b.storeCode)}</span> · ${esc(b.slug)}</div></div><div style="display:flex;gap:6px"><button onclick="window._saViewBiz('${b.id}')" class="btn btn-ghost btn-sm">View</button><button onclick="window._saDeleteBiz('${b.id}','${esc(b.name)}')" class="btn btn-sm" style="background:rgba(255,68,85,.1);color:var(--red);border:1px solid rgba(255,68,85,.2)">Delete</button></div></div>`).join('')}
+        ${businesses.length === 0
+          ? '<div class="card" style="text-align:center;color:var(--gray);padding:30px">No businesses yet.</div>'
+          : businesses.map(b => `
+            <div class="plain-card">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:700">${esc(b.name)}</div>
+                  <div style="font-size:12px;color:var(--gray)">Code: <span style="color:var(--green);font-weight:700">${esc(b.storeCode)}</span> · ${esc(b.slug)}</div>
+                </div>
+                <div style="display:flex;gap:6px">
+                  <button onclick="window._saManageLinks('${b.id}','${esc(b.name)}')" class="btn btn-ghost btn-sm">🔗 Links</button>
+                  <button onclick="window._saViewBiz('${b.id}')" class="btn btn-ghost btn-sm">View</button>
+                  <button onclick="window._saDeleteBiz('${b.id}','${esc(b.name)}')" class="btn btn-sm" style="background:rgba(255,68,85,.1);color:var(--red);border:1px solid rgba(255,68,85,.2)">Del</button>
+                </div>
+              </div>
+            </div>`).join('')
+        }
       </div>`;
   }
-  var allBiz=[];
-  try{var saR=await fetch('/api/business?listAll=1',{headers:{'Authorization':'Bearer '+API.auth.getToken()}});var saD=await saR.json();if(saD.businesses)allBiz=saD.businesses;}catch(e){}
+
   draw(allBiz);
-  window._saSearch=async function(q){
-    if(!q||q.length<2)return;
-    try{var d=await API.business.getBySlug(q.trim().toLowerCase());if(d.business){window._saLastFound=d.business;var list=$('sa-biz-list');if(list)list.innerHTML='<div class="plain-card" style="display:flex;align-items:center;gap:12px"><div style="flex:1;min-width:0"><div style="font-weight:700">'+esc(d.business.name)+'</div><div style="font-size:12px;color:var(--gray)">Code: <span style="color:var(--green);font-weight:700">'+esc(d.business.storeCode)+'</span> · '+esc(d.business.slug)+'</div></div><div style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" onclick="window._saViewBiz(window._saLastFound.id)">View</button><button class="btn btn-sm" style="background:rgba(255,68,85,.1);color:var(--red);border:1px solid rgba(255,68,85,.2)" onclick="window._saDeleteBiz(window._saLastFound.id,window._saLastFound.name)">Delete</button></div></div>';}}catch(e2){}
+
+  // ── Manage platform links for a business ──────────────────────────────────
+  window._saManageLinks = async function(bizId, bizName) {
+    showLoading('Loading…');
+    var bizData;
+    try {
+      var r = await API.business.getById(bizId);
+      bizData = r.business;
+    } catch(e) { showToast('Failed to load business'); renderSuperAdminDashboard(); return; }
+
+    var platformLinks = bizData.platformLinks
+      ? [...bizData.platformLinks]
+      : PLATFORM_DEFAULTS.map(p => ({...p, enabled: false}));
+
+    // Ensure all defaults are represented
+    PLATFORM_DEFAULTS.forEach(def => {
+      if (!platformLinks.find(p => p.platform === def.platform)) {
+        platformLinks.push({...def, enabled: false});
+      }
+    });
+
+    body.innerHTML = `
+      <button onclick="window._saT('biz')" style="background:none;border:none;color:var(--gray);font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;margin-bottom:16px;padding:0">← Back to Businesses</button>
+      <div style="font-weight:700;font-size:16px;margin-bottom:4px">🔗 Review Links</div>
+      <div style="font-size:12px;color:var(--gray);margin-bottom:16px">${esc(bizName)}</div>
+      <div id="sa-links-list"></div>
+      <button onclick="window._saSaveLinks('${bizId}')" class="btn btn-primary btn-full" style="margin-top:8px">Save Platform Links</button>`;
+
+    function drawLinks() {
+      var ll = document.getElementById('sa-links-list');
+      if (!ll) return;
+      ll.innerHTML = platformLinks.map((p, i) => `
+        <div style="background:rgba(255,255,255,.04);border:1px solid ${p.enabled?'rgba(0,229,160,.25)':'rgba(255,255,255,.07)'};border-radius:12px;padding:14px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:${p.enabled?'10px':'0'}">
+            <div style="font-size:22px">${_platformIcon(p.platform)}</div>
+            <div style="flex:1;font-weight:700;font-size:14px">${esc(p.label||p.platform)}</div>
+            <div class="toggle${p.enabled?' on':''}" onclick="window._saTogPlat(${i})" style="flex-shrink:0"><div class="toggle-thumb"></div></div>
+          </div>
+          ${p.enabled ? `
+            <div class="field-lbl">URL for ${esc(p.label||p.platform)}</div>
+            <input class="inp" id="sa-pl-url-${i}" value="${esc(p.url||'')}" placeholder="https://…" style="font-size:13px"/>
+            <div class="field-lbl" style="margin-top:8px">Display Label</div>
+            <input class="inp" id="sa-pl-lbl-${i}" value="${esc(p.label||p.platform)}" placeholder="${esc(p.platform)}" style="font-size:13px"/>
+          ` : ''}
+        </div>`).join('');
+    }
+
+    drawLinks();
+
+    window._saTogPlat = function(i) {
+      // Save current field values before redrawing
+      platformLinks.forEach((p, j) => {
+        if (p.enabled) {
+          const urlEl = document.getElementById('sa-pl-url-'+j);
+          const lblEl = document.getElementById('sa-pl-lbl-'+j);
+          if (urlEl) platformLinks[j].url   = urlEl.value.trim();
+          if (lblEl) platformLinks[j].label = lblEl.value.trim() || platformLinks[j].platform;
+        }
+      });
+      platformLinks[i].enabled = !platformLinks[i].enabled;
+      drawLinks();
+    };
+
+    window._saSaveLinks = async function(bId) {
+      // Collect current values
+      platformLinks.forEach((p, j) => {
+        if (p.enabled) {
+          const urlEl = document.getElementById('sa-pl-url-'+j);
+          const lblEl = document.getElementById('sa-pl-lbl-'+j);
+          if (urlEl) platformLinks[j].url   = urlEl.value.trim();
+          if (lblEl) platformLinks[j].label = lblEl.value.trim() || platformLinks[j].platform;
+        }
+      });
+      // Validate enabled ones have URLs
+      const missing = platformLinks.filter(p => p.enabled && !p.url);
+      if (missing.length) { showToast('Add URLs for all enabled platforms'); return; }
+      try {
+        await API.business.update(bId, { platformLinks });
+        showToast('Platform links saved ✓');
+      } catch(e) { showToast(e.message || 'Save failed'); }
+    };
   };
-  window._saViewBiz=async function(id){showLoading('Loading…');try{var d=await API.business.getById(id);State.biz=d.business;State.session={...State.session,bizId:id,role:'bizAdmin'};await loadDashboardData();renderDashboard();}catch(e){showToast(e.message||'Failed');renderSuperAdminDashboard();}};
-  window._saDeleteBiz=async function(id,name){if(!confirm('Delete '+name+'? This cannot be undone.'))return;showLoading('Deleting…');try{await API.business.delete(id);showToast(name+' deleted');renderSuperAdminDashboard();}catch(e){showToast(e.message||'Delete failed');renderSuperAdminDashboard();}};
-  window._saCreateBiz=function(){
-    showModal(`<div class="modal-head"><div class="modal-title">Create Business</div><button class="modal-close" onclick="closeModal()">×</button></div>
+
+  window._saSearch = async function(q) {
+    if (!q || q.length < 2) return;
+    try {
+      var d = await API.business.getBySlug(q.trim().toLowerCase());
+      if (d.business) {
+        window._saLastFound = d.business;
+        var list = $('sa-biz-list');
+        if (list) list.innerHTML = `
+          <div class="plain-card">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700">${esc(d.business.name)}</div>
+                <div style="font-size:12px;color:var(--gray)">Code: <span style="color:var(--green);font-weight:700">${esc(d.business.storeCode)}</span> · ${esc(d.business.slug)}</div>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button onclick="window._saManageLinks('${d.business.id}','${esc(d.business.name)}')" class="btn btn-ghost btn-sm">🔗 Links</button>
+                <button onclick="window._saViewBiz('${d.business.id}')" class="btn btn-ghost btn-sm">View</button>
+              </div>
+            </div>
+          </div>`;
+      }
+    } catch(e2) {}
+  };
+
+  window._saViewBiz = async function(id) {
+    showLoading('Loading…');
+    try {
+      var d = await API.business.getById(id);
+      State.biz = d.business;
+      State.session = { ...State.session, bizId: id, role: 'bizAdmin' };
+      await loadDashboardData();
+      renderDashboard();
+    } catch(e) { showToast(e.message || 'Failed'); renderSuperAdminDashboard(); }
+  };
+
+  window._saDeleteBiz = async function(id, name) {
+    if (!confirm('Delete ' + name + '? This cannot be undone.')) return;
+    showLoading('Deleting…');
+    try {
+      await API.business.delete(id);
+      showToast(name + ' deleted');
+      renderSuperAdminDashboard();
+    } catch(e) { showToast(e.message || 'Delete failed'); renderSuperAdminDashboard(); }
+  };
+
+  window._saCreateBiz = function() {
+    showModal(`
+      <div class="modal-head">
+        <div class="modal-title">Create Business</div>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
       <div style="display:flex;flex-direction:column;gap:12px">
         <div><div class="field-lbl">Owner Email</div><input class="inp" id="sa-cb-email" type="email" placeholder="owner@business.com"/></div>
         <div><div class="field-lbl">Owner Password</div><input class="inp" id="sa-cb-pass" type="password" placeholder="Min 6 characters"/></div>
@@ -1059,20 +1252,31 @@ async function saBiz(){
         <div><div class="field-lbl">Manager PIN (4-6 digits)</div><input class="inp" id="sa-cb-mgr" type="number" inputmode="numeric" placeholder="e.g. 5678"/></div>
         <button class="btn btn-primary btn-full" onclick="window._saDoCreate()">Create Business</button>
       </div>`);
-    window._saDoCreate=async function(){
-      var email=$('sa-cb-email')?.value?.trim(),pass=$('sa-cb-pass')?.value,name=$('sa-cb-name')?.value?.trim(),adminPin=$('sa-cb-admin')?.value?.trim(),mgrPin=$('sa-cb-mgr')?.value?.trim();
-      if(!email){showToast('Enter owner email');return;}if(!pass||pass.length<6){showToast('Password must be 6+ characters');return;}
-      if(!name){showToast('Enter business name');return;}if(!adminPin||adminPin.length<4){showToast('Admin PIN must be 4+ digits');return;}
-      if(!mgrPin||mgrPin.length<4){showToast('Manager PIN must be 4+ digits');return;}if(adminPin===mgrPin){showToast('PINs must be different');return;}
-      closeModal();showLoading('Creating…');
-      try{
-        var cred=await fbAuth.createUserWithEmailAndPassword(email,pass);var idToken=await cred.user.getIdToken();
-        sessionStorage.setItem('tp_session',JSON.stringify({token:idToken}));
-        var d=await API.business.create({name,adminPin,managerPin:mgrPin});
-        sessionStorage.setItem('tp_session',JSON.stringify(State.session));
-        showToast(name+' created! Code: '+d.business.storeCode,4000);
-        renderSuperAdminDashboard();setTimeout(()=>window._saT('biz'),500);
-      }catch(e){sessionStorage.setItem('tp_session',JSON.stringify(State.session));showToast(e.message||'Failed');renderSuperAdminDashboard();}
+    window._saDoCreate = async function() {
+      var email = $('sa-cb-email')?.value?.trim(), pass = $('sa-cb-pass')?.value;
+      var name  = $('sa-cb-name')?.value?.trim();
+      var adminPin = $('sa-cb-admin')?.value?.trim(), mgrPin = $('sa-cb-mgr')?.value?.trim();
+      if (!email)   { showToast('Enter owner email'); return; }
+      if (!pass || pass.length < 6) { showToast('Password must be 6+ characters'); return; }
+      if (!name)    { showToast('Enter business name'); return; }
+      if (!adminPin || adminPin.length < 4) { showToast('Admin PIN must be 4+ digits'); return; }
+      if (!mgrPin   || mgrPin.length < 4)   { showToast('Manager PIN must be 4+ digits'); return; }
+      if (adminPin === mgrPin) { showToast('PINs must be different'); return; }
+      closeModal(); showLoading('Creating…');
+      try {
+        var cred    = await fbAuth.createUserWithEmailAndPassword(email, pass);
+        var idToken = await cred.user.getIdToken();
+        sessionStorage.setItem('tp_session', JSON.stringify({ token: idToken }));
+        var d = await API.business.create({ name, adminPin, managerPin: mgrPin });
+        sessionStorage.setItem('tp_session', JSON.stringify(State.session));
+        showToast(name + ' created! Code: ' + d.business.storeCode, 4000);
+        renderSuperAdminDashboard();
+        setTimeout(() => window._saT('biz'), 500);
+      } catch(e) {
+        sessionStorage.setItem('tp_session', JSON.stringify(State.session));
+        showToast(e.message || 'Failed');
+        renderSuperAdminDashboard();
+      }
     };
   };
 }
@@ -1105,14 +1309,25 @@ async function renderTapPage(bizSlug,staffSlug){
   function updateStars(r){for(let i=1;i<=5;i++){const el=$('cs'+i);if(el)el.className='star'+(i<=r?' lit':'');}}
   function afterRate(r){
     const el=$('after');if(!el)return;
-    if(r>=4){
-      var pm=esc(b.reviewPrompt||'Share your experience!');
-      var lh=links.length?links.map(l=>linkRow(l)).join(''):'<div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:18px;text-align:center;color:rgba(238,240,248,.5);font-size:14px">No review links configured yet</div>';
+    const links=biz.reviewLinks||biz.links||[];
+    if(r===5){
+      const primary=links[0];
+      const msg=esc(b.thankYouMsg||'Thank you! Redirecting you now\u2026');
+      el.innerHTML=`<div style="text-align:center;padding:20px 0">
+        <div style="font-size:40px;margin-bottom:12px">🙏</div>
+        <div style="font-size:18px;font-weight:800;margin-bottom:8px">${msg}</div>
+        ${primary?`<div style="font-size:13px;color:rgba(238,240,248,.4)">Taking you to ${esc(primary.label||primary.platform)}\u2026</div>`:''}
+      </div>`;
+      if(tapId)API.taps.update(tapId,{rating:r,status:'rated'}).catch(console.error);
+      if(primary)setTimeout(()=>{window.location.href=primary.url;},1800);
+    }else if(r===4){
+      const pm=esc(b.reviewPrompt||'Share your experience!');
+      const lh=links.length?links.map(l=>linkRow(l)).join(''):'<div style="padding:16px;text-align:center;color:rgba(238,240,248,.5);font-size:14px">No review links configured</div>';
       el.innerHTML='<div style="text-align:center;margin-bottom:20px"><div style="font-size:18px;font-weight:800;margin-bottom:8px">'+pm+'</div></div>'+lh;
       if(tapId)API.taps.update(tapId,{rating:r,status:'rated'}).catch(console.error);
     }else if(r<=3){
       el.innerHTML=`<div style="text-align:center;margin-bottom:16px"><div style="font-size:18px;font-weight:800;margin-bottom:6px">${esc(b.lowRatingMsg||"We're sorry to hear that.")}</div></div>
-        <textarea id="fb-t" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px;color:inherit;font-size:14px;font-family:'Nunito',sans-serif;outline:none;resize:none;min-height:100px;margin-bottom:12px" placeholder="Tell us what happened…"></textarea>
+        <textarea id="fb-t" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:14px;color:inherit;font-size:14px;font-family:'Nunito',sans-serif;outline:none;resize:none;min-height:100px;margin-bottom:12px" placeholder="Tell us what happened\u2026"></textarea>
         <button onclick="window._fb(${r})" style="width:100%;background:${esc(b.brandColor||'#00e5a0')};color:#07080c;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif">Submit</button>`;
       window._fb=async function(rating){const text=$('fb-t')?.value?.trim()||'';if(tapId)await API.taps.update(tapId,{rating,feedback:text,status:'rated'}).catch(console.error);el.innerHTML=`<div style="text-align:center;padding:20px"><div style="font-size:40px;margin-bottom:12px">🙏</div><div style="font-size:18px;font-weight:800">${esc(b.thankYouMsg||'Thank you for your feedback!')}</div></div>`;};
     }
