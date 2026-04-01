@@ -160,9 +160,13 @@ module.exports = async function handler(req, res) {
 
   // ── PUT — Update business ────────────────────────────────────────────────
   if (req.method === 'PUT') {
-    const session = getSession(req);
-    const guard   = requireRole(session, 'bizAdmin');
-    if (guard) return err(res, guard.error, guard.status);
+    const session    = getSession(req);
+    const isManager  = session?.role === 'manager';
+    const isBizAdmin = session?.role === 'bizAdmin' || session?.role === 'superAdmin';
+
+    if (!isManager && !isBizAdmin) {
+      return err(res, 'Forbidden', 403);
+    }
 
     const { id } = req.query;
     if (!id) return err(res, 'Business ID required');
@@ -177,19 +181,24 @@ module.exports = async function handler(req, res) {
     const body    = req.body || {};
     const updates = {};
 
-    // ── FIXED: platformLinks and reviewLinks are now allowed ──
-    const allowed = ['name', 'branding', 'links', 'teamGoals', 'platformLinks', 'reviewLinks'];
+    // Managers can only update teamGoals
+    // bizAdmin+ can update everything
+    const allowed = isBizAdmin
+      ? ['name', 'branding', 'links', 'teamGoals', 'platformLinks', 'reviewLinks']
+      : ['teamGoals'];
+
     for (const key of allowed) {
       if (body[key] !== undefined) updates[key] = body[key];
     }
 
-    if (body.adminPin)   updates.adminPinHash = hashPin(body.adminPin);
-    if (body.managerPin) updates.mgrPinHash   = hashPin(body.managerPin);
-
-    if (body.name) {
-      let newSlug = toSlug(body.name);
-      if (await slugExists(newSlug, id)) newSlug = newSlug + '-' + uid().slice(0, 4);
-      updates.slug = newSlug;
+    if (isBizAdmin) {
+      if (body.adminPin)   updates.adminPinHash = hashPin(body.adminPin);
+      if (body.managerPin) updates.mgrPinHash   = hashPin(body.managerPin);
+      if (body.name) {
+        let newSlug = toSlug(body.name);
+        if (await slugExists(newSlug, id)) newSlug = newSlug + '-' + uid().slice(0, 4);
+        updates.slug = newSlug;
+      }
     }
 
     updates.updatedAt = Date.now();
