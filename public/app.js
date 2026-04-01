@@ -372,16 +372,284 @@ function renderFeedbackTab(me){
   return fb.map(t=>`<div class="fb-item"><div class="fb-stars">${'★'.repeat(t.rating||0)}${'☆'.repeat(5-(t.rating||0))}</div><div class="fb-text">${esc(t.feedback)}</div>${t.feedbackPhoto?`<img src="${esc(t.feedbackPhoto)}" style="width:100%;border-radius:8px;margin-top:8px;max-height:200px;object-fit:cover"/>`:''}<div class="fb-meta">${timeAgo(t.ts)}</div></div>`).join('');
 }
 
-function renderGoalsTab(me){
-  const goals=State.biz?.teamGoals||[];
-  if(!goals.length)return`<div class="card" style="text-align:center;color:var(--gray);padding:40px">No goals set yet.</div>`;
-  return goals.map(g=>{
-    const mine=me?State.taps.filter(t=>t.staffId===me.id):State.taps;
-    const val=g.metric==='taps'?mine.length:g.metric==='fivestar'?mine.filter(t=>t.rating===5).length:0;
-    const pct=Math.min(100,Math.round(val/g.target*100));
-    return`<div class="goal-row"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><div style="font-weight:700">${esc(g.label)}</div><div style="font-size:13px;color:var(--gray)">${val}/${g.target}</div></div><div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%"></div></div><div style="font-size:11px;color:var(--gray);margin-top:4px;text-align:right">${pct}%</div></div>`;
-  }).join('');
+// ── Goals Tab ─────────────────────────────────────────────────────────────────
+// Works for staff (read-only progress), manager & bizAdmin (full create/edit)
+
+function renderGoalsTab(me) {
+  const role   = State.session?.role;
+  const isManager = role === 'manager' || role === 'bizAdmin' || role === 'superAdmin';
+  let goalView = 'team'; // 'team' | 'individual'
+  let selStaffId = State.staff.filter(s => s.active)[0]?.id || null;
+
+  // ── Metric helpers ──────────────────────────────────────────────────────
+  function getTapsInRange(taps, startTs, endTs) {
+    return taps.filter(t => t.ts >= startTs && t.ts <= endTs);
+  }
+
+  function calcMetric(metric, taps) {
+    const rated = taps.filter(t => t.rating);
+    switch (metric) {
+      case 'taps':    return taps.length;
+      case 'fivestar': return rated.filter(t => t.rating === 5).length;
+      case 'avgrating': {
+        if (!rated.length) return 0;
+        return parseFloat((rated.reduce((s,t) => s+t.rating, 0) / rated.length).toFixed(2));
+      }
+      case 'ctr': {
+        if (!taps.length) return 0;
+        return Math.round(rated.length / taps.length * 100);
+      }
+      default: return 0;
+    }
+  }
+
+  function metricLabel(metric) {
+    return { taps:'Taps', fivestar:'5★ Reviews', avgrating:'Avg Rating', ctr:'CTR %' }[metric] || metric;
+  }
+
+  function metricUnit(metric) {
+    return { taps:'taps', fivestar:'reviews', avgrating:'stars', ctr:'%' }[metric] || '';
+  }
+
+  function goalProgress(g, staffId) {
+    const now = Date.now();
+    const start = g.startDate ? new Date(g.startDate).getTime() : 0;
+    const end   = g.endDate   ? new Date(g.endDate).setHours(23,59,59,999) : now;
+    const srcTaps = staffId
+      ? State.taps.filter(t => t.staffId === staffId)
+      : State.taps;
+    const rangeTaps = getTapsInRange(srcTaps, start, end);
+    const val = calcMetric(g.metric, rangeTaps);
+    const pct = g.metric === 'avgrating'
+      ? Math.min(100, Math.round((val / g.target) * 100))
+      : Math.min(100, Math.round((val / g.target) * 100));
+    return { val, pct };
+  }
+
+  // ── Goal card renderer ──────────────────────────────────────────────────
+  function goalCard(g, i, staffId, showEdit) {
+    const { val, pct } = goalProgress(g, staffId || null);
+    const isComplete = pct >= 100;
+    const barColor = isComplete ? '#00e5a0' : pct >= 60 ? '#ffd166' : '#4facfe';
+    const dateRange = g.startDate && g.endDate
+      ? `${g.startDate} → ${g.endDate}`
+      : g.startDate ? `From ${g.startDate}` : 'Ongoing';
+
+    return `
+      <div style="background:rgba(255,255,255,.04);border:1px solid ${isComplete?'rgba(0,229,160,.3)':'rgba(255,255,255,.07)'};border-radius:14px;padding:14px;margin-bottom:10px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:15px">${esc(g.label)}</div>
+            <div style="font-size:11px;color:var(--gray);margin-top:2px">${metricLabel(g.metric)} · ${esc(dateRange)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:10px">
+            ${isComplete ? '<span style="font-size:16px">✅</span>' : ''}
+            ${showEdit ? `
+              <button onclick="window._editGoal(${i},'${goalView}','${staffId||''}')"
+                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:rgba(238,240,248,.6);cursor:pointer;font-family:'Nunito',sans-serif">Edit</button>
+              <button onclick="window._deleteGoal(${i},'${goalView}','${staffId||''}')"
+                style="background:rgba(255,68,85,.08);border:1px solid rgba(255,68,85,.2);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:var(--red);cursor:pointer;font-family:'Nunito',sans-serif">✕</button>
+            ` : ''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <div style="flex:1;height:8px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .5s ease"></div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:${barColor};width:36px;text-align:right">${pct}%</div>
+        </div>
+        <div style="font-size:12px;color:var(--gray)">${val} / ${g.target} ${metricUnit(g.metric)}</div>
+      </div>`;
+  }
+
+  // ── Add/Edit modal ──────────────────────────────────────────────────────
+  function showGoalModal(existing, onSave) {
+    const g = existing || { label:'', metric:'taps', target: 10, startDate:'', endDate:'' };
+    const today = new Date().toISOString().slice(0,10);
+
+    showModal(`
+      <div class="modal-head">
+        <div class="modal-title">${existing ? 'Edit Goal' : 'Add Goal'}</div>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <div class="field-lbl">Goal Label</div>
+          <input class="inp" id="gl-label" value="${esc(g.label)}" placeholder="e.g. 50 Taps This Month"/>
+        </div>
+        <div>
+          <div class="field-lbl">Metric</div>
+          <select class="sel" id="gl-metric">
+            <option value="taps"      ${g.metric==='taps'?'selected':''}>Taps</option>
+            <option value="fivestar"  ${g.metric==='fivestar'?'selected':''}>5★ Reviews</option>
+            <option value="avgrating" ${g.metric==='avgrating'?'selected':''}>Avg Star Rating</option>
+            <option value="ctr"       ${g.metric==='ctr'?'selected':''}>CTR %</option>
+          </select>
+        </div>
+        <div>
+          <div class="field-lbl">Target</div>
+          <input class="inp" id="gl-target" type="number" value="${g.target}" placeholder="e.g. 50" min="1"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div class="field-lbl">Start Date</div>
+            <input class="inp" id="gl-start" type="date" value="${g.startDate||today}"/>
+          </div>
+          <div>
+            <div class="field-lbl">End Date</div>
+            <input class="inp" id="gl-end" type="date" value="${g.endDate||''}"/>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="window._saveGoalModal()">
+          ${existing ? 'Save Changes' : 'Add Goal'}
+        </button>
+      </div>`);
+
+    window._saveGoalModal = function() {
+      const label  = $('gl-label')?.value?.trim();
+      const metric = $('gl-metric')?.value;
+      const target = parseFloat($('gl-target')?.value);
+      const startDate = $('gl-start')?.value;
+      const endDate   = $('gl-end')?.value;
+      if (!label)         { showToast('Enter a goal label'); return; }
+      if (!target || target <= 0) { showToast('Enter a valid target'); return; }
+      if (!startDate)     { showToast('Pick a start date'); return; }
+      closeModal();
+      onSave({ label, metric, target, startDate, endDate });
+    };
+  }
+
+  // ── Save goals to backend ───────────────────────────────────────────────
+  async function persistGoals(teamGoals) {
+    try {
+      const d = await API.business.update(State.session.bizId, { teamGoals });
+      State.biz = { ...State.biz, ...d.business };
+      showToast('Goals saved ✓');
+    } catch(e) { showToast(e.message || 'Save failed'); }
+  }
+
+  // ── Draw ────────────────────────────────────────────────────────────────
+  function draw() {
+    const body = $('dash-body');
+    if (!body) return;
+
+    const activeStaff = State.staff.filter(s => s.active);
+    const teamGoals   = State.biz?.teamGoals || [];
+
+    // Individual goals are stored as g.staffId on the goal object
+    // Team goals have no staffId
+    const tGoals = teamGoals.filter(g => !g.staffId);
+    const iGoals = staffId => teamGoals.filter(g => g.staffId === staffId);
+
+    if (!selStaffId && activeStaff.length) selStaffId = activeStaff[0].id;
+
+    body.innerHTML = `
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <button onclick="window._goalView('team')"
+          style="flex:1;padding:10px;border-radius:20px;font-weight:700;font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;
+            border:1px solid ${goalView==='team'?'rgba(0,229,160,.4)':'rgba(255,255,255,.1)'};
+            background:${goalView==='team'?'rgba(0,229,160,.12)':'rgba(255,255,255,.04)'};
+            color:${goalView==='team'?'#00e5a0':'rgba(238,240,248,.5)'}">
+          🏆 Team Goals
+        </button>
+        <button onclick="window._goalView('individual')"
+          style="flex:1;padding:10px;border-radius:20px;font-weight:700;font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;
+            border:1px solid ${goalView==='individual'?'rgba(0,229,160,.4)':'rgba(255,255,255,.1)'};
+            background:${goalView==='individual'?'rgba(0,229,160,.12)':'rgba(255,255,255,.04)'};
+            color:${goalView==='individual'?'#00e5a0':'rgba(238,240,248,.5)'}">
+          👤 Individual Goals
+        </button>
+      </div>
+
+      ${goalView === 'team' ? `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div style="font-size:12px;color:var(--gray)">Goals for the whole team</div>
+          ${isManager ? `<button onclick="window._addGoal('team','')"
+            style="background:var(--green);color:var(--black);border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Nunito',sans-serif">
+            + Add Team Goal</button>` : ''}
+        </div>
+        <div id="goals-list">
+          ${tGoals.length === 0
+            ? '<div style="text-align:center;color:var(--gray);padding:40px 0">No team goals yet.</div>'
+            : tGoals.map((g, i) => goalCard(g, i, null, isManager)).join('')}
+        </div>
+      ` : `
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+          ${activeStaff.map(s => `
+            <button onclick="window._selStaff('${s.id}')"
+              style="display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Nunito',sans-serif;
+                border:1px solid ${selStaffId===s.id?'rgba(0,229,160,.4)':'rgba(255,255,255,.1)'};
+                background:${selStaffId===s.id?'rgba(0,229,160,.12)':'rgba(255,255,255,.04)'};
+                color:${selStaffId===s.id?'#00e5a0':'rgba(238,240,248,.5)'}">
+              ${staffAvatar(s, 20)} ${esc(staffDisplay(s))}
+            </button>`).join('')}
+        </div>
+        ${selStaffId ? `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gray)">Goals For</div>
+            ${isManager ? `<button onclick="window._addGoal('individual','${selStaffId}')"
+              style="background:var(--green);color:var(--black);border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Nunito',sans-serif">
+              + Add Goal</button>` : ''}
+          </div>
+          <div id="goals-list">
+            ${iGoals(selStaffId).length === 0
+              ? '<div style="text-align:center;color:var(--gray);padding:40px 0">No goals set yet.</div>'
+              : iGoals(selStaffId).map((g, i) => {
+                  const realIdx = teamGoals.indexOf(g);
+                  return goalCard(g, realIdx, selStaffId, isManager);
+                }).join('')}
+          </div>
+        ` : '<div style="text-align:center;color:var(--gray);padding:40px 0">No active staff.</div>'}
+      `}`;
+
+    // ── Handlers ────────────────────────────────────────────────────────
+    window._goalView = function(v) { goalView = v; draw(); };
+    window._selStaff = function(id) { selStaffId = id; draw(); };
+
+    window._addGoal = function(type, staffId) {
+      showGoalModal(null, async function(newGoal) {
+        if (type === 'individual' && staffId) newGoal.staffId = staffId;
+        const updated = [...(State.biz?.teamGoals || []), newGoal];
+        await persistGoals(updated);
+        draw();
+      });
+    };
+
+    window._editGoal = function(idx, type, staffId) {
+      const goals = State.biz?.teamGoals || [];
+      const g = goals[idx];
+      if (!g) return;
+      showGoalModal(g, async function(updated) {
+        if (type === 'individual' && staffId) updated.staffId = staffId;
+        const newGoals = [...goals];
+        newGoals[idx] = updated;
+        await persistGoals(newGoals);
+        draw();
+      });
+    };
+
+    window._deleteGoal = function(idx, type, staffId) {
+      if (!confirm('Delete this goal?')) return;
+      const goals = [...(State.biz?.teamGoals || [])];
+      goals.splice(idx, 1);
+      persistGoals(goals).then(() => draw());
+    };
+  }
+
+  // Staff view — read only progress
+  if (!isManager && me) {
+    // Staff sees their own goals + team goals
+    const teamGoals = State.biz?.teamGoals || [];
+    const myGoals   = teamGoals.filter(g => !g.staffId || g.staffId === me.id);
+    if (!myGoals.length) return '<div class="card" style="text-align:center;color:var(--gray);padding:40px">No goals set yet.</div>';
+    return myGoals.map((g, i) => goalCard(g, i, me.id, false)).join('');
+  }
+
+  // Manager/Admin — full UI, rendered async via draw()
+  setTimeout(() => draw(), 0);
+  return '<div id="goals-list" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></div>';
 }
+
 
 function renderStatsTab(me){
   const myT=me?State.taps.filter(t=>t.staffId===me.id):State.taps;
