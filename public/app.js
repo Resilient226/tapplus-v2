@@ -521,8 +521,10 @@ function renderGoalsTab(me) {
 
   // ── Save goals to backend ───────────────────────────────────────────────
   async function persistGoals(teamGoals) {
+    const bizId = State.session?.bizId || State.biz?.id;
+    if (!bizId) { showToast('No business ID — try logging out and back in'); return; }
     try {
-      const d = await API.business.update(State.session.bizId, { teamGoals });
+      const d = await API.business.update(bizId, { teamGoals });
       State.biz = { ...State.biz, ...d.business };
       showToast('Goals saved ✓');
     } catch(e) { showToast(e.message || 'Save failed'); }
@@ -724,7 +726,7 @@ function renderBrandingTab(body,me){
   window._saveBr=async function(){
     const title=($('br-title')||{}).value?.trim()||'';
     const photo=photoData!==undefined?photoData:me.photo;
-    try{await API.staff.update(State.session.bizId,me.id,{title,photo,links});const idx=State.staff.findIndex(s=>s.id===me.id);if(idx>=0)State.staff[idx]={...State.staff[idx],title,photo,links};showToast('Saved ✨');renderDashboard();}
+    try{await API.staff.update(State.session?.bizId||State.biz?.id,me.id,{title,photo,links});const idx=State.staff.findIndex(s=>s.id===me.id);if(idx>=0)State.staff[idx]={...State.staff[idx],title,photo,links};showToast('Saved ✨');renderDashboard();}
     catch(e){showToast(e.message||'Save failed');}
   };
 }
@@ -1076,12 +1078,12 @@ function renderStaffTab(body){
       if(!fn){showToast('Enter first name');return;}if(!li){showToast('Enter last initial');return;}
       if(!pa||pa.length!==4){showToast('Passcode must be 4 digits');return;}
       closeModal();
-      try{const d=await API.staff.create(State.session.bizId,{firstName:fn,lastInitial:li,title:ti,passcode:pa});State.staff.push(d.staff);showToast(fn+' added ✓');draw();}
+      try{const d=await API.staff.create(State.session?.bizId||State.biz?.id,{firstName:fn,lastInitial:li,title:ti,passcode:pa});State.staff.push(d.staff);showToast(fn+' added ✓');draw();}
       catch(e){showToast(e.message||'Failed');draw();}
     };
   };
   window._togS=async function(id,active){
-    try{await API.staff.update(State.session.bizId,id,{active:!active});const i=State.staff.findIndex(s=>s.id===id);if(i>=0)State.staff[i].active=!active;draw();}
+    try{await API.staff.update(State.session?.bizId||State.biz?.id,id,{active:!active});const i=State.staff.findIndex(s=>s.id===id);if(i>=0)State.staff[i].active=!active;draw();}
     catch(e){showToast(e.message||'Failed');}
   };
   window._editS=function(id){
@@ -1099,12 +1101,12 @@ function renderStaffTab(body){
       const u={firstName:$('es-fn')?.value?.trim(),lastInitial:$('es-li')?.value?.trim().toUpperCase(),title:$('es-ti')?.value?.trim()};
       const np=$('es-pa')?.value?.trim();if(np){if(np.length!==4){showToast('Passcode must be 4 digits');return;}u.passcode=np;}
       closeModal();
-      try{const d=await API.staff.update(State.session.bizId,sid,u);const i=State.staff.findIndex(x=>x.id===sid);if(i>=0)State.staff[i]={...State.staff[i],...d.staff};showToast('Saved ✓');draw();}
+      try{const d=await API.staff.update(State.session?.bizId||State.biz?.id,sid,u);const i=State.staff.findIndex(x=>x.id===sid);if(i>=0)State.staff[i]={...State.staff[i],...d.staff};showToast('Saved ✓');draw();}
       catch(e){showToast(e.message||'Failed');}
     };
     window._delS=async function(sid){
       if(!confirm('Delete this staff member?'))return;closeModal();
-      try{await API.staff.delete(State.session.bizId,sid);State.staff=State.staff.filter(x=>x.id!==sid);showToast('Deleted');draw();}
+      try{await API.staff.delete(State.session?.bizId||State.biz?.id,sid);State.staff=State.staff.filter(x=>x.id!==sid);showToast('Deleted');draw();}
       catch(e){showToast(e.message||'Failed');}
     };
   };
@@ -1348,7 +1350,8 @@ function renderSettingsTab(body) {
       }
     };
     try{
-      const d=await API.business.update(State.session.bizId,updates);
+      const bizId=State.session?.bizId||State.biz?.id;
+      const d=await API.business.update(bizId,updates);
       State.biz={...State.biz,...d.business};
       window._logoData=undefined;
       showToast('Branding saved ✓');
