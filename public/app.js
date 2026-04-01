@@ -636,18 +636,17 @@ function renderGoalsTab(me) {
     };
   }
 
-  // Staff view — read only progress
-  if (!isManager && me) {
-    // Staff sees their own goals + team goals
+  // Staff view — read only progress (rendered into dash-body directly)
+  if (!isManager) {
     const teamGoals = State.biz?.teamGoals || [];
-    const myGoals   = teamGoals.filter(g => !g.staffId || g.staffId === me.id);
+    const myGoals   = teamGoals.filter(g => !g.staffId || g.staffId === (me?.id));
     if (!myGoals.length) return '<div class="card" style="text-align:center;color:var(--gray);padding:40px">No goals set yet.</div>';
-    return myGoals.map((g, i) => goalCard(g, i, me.id, false)).join('');
+    return myGoals.map((g, i) => goalCard(g, i, me?.id || null, false)).join('');
   }
 
   // Manager/Admin — full UI, rendered async via draw()
   setTimeout(() => draw(), 0);
-  return '<div id="goals-list" style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></div>';
+  return '<div style="text-align:center;padding:40px"><div class="spinner" style="margin:0 auto"></div></div>';
 }
 
 
