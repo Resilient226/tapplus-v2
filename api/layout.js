@@ -10,7 +10,7 @@ const DOC = db.collection('platformSettings').doc('dashboardLayouts');
 const DEFAULT_LAYOUTS = {
   staff:    ['coaching', 'feedback', 'goals', 'stats', 'branding'],
   manager:  ['ai', 'team', 'staff', 'links', 'goals', 'estimator'],
-  bizAdmin: ['ai', 'team', 'staff', 'links', 'goals', 'branding', 'settings'],
+  bizAdmin: ['ai', 'team', 'staff', 'links', 'goals', 'settings'],
 };
 
 module.exports = async function handler(req, res) {

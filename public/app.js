@@ -153,6 +153,8 @@ function renderPinLogin(role){
         else if(role==='manager')d=await API.auth.loginManager(State.biz.id,pin);
         else d=await API.auth.loginBizAdmin(State.biz.id,pin);
         State.session=d;
+        // Re-fetch full business data (getByCode only returns id/name/slug/branding)
+        try{const bd=await API.business.getById(State.session.bizId);State.biz=bd.business;}catch{}
         await loadDashboardData();
         renderDashboard();
       }catch{showToast('Invalid PIN — try again');renderPinLogin(role);}
@@ -706,7 +708,8 @@ function renderBrandingTab(body,me){
     el.innerHTML=links.length?links.map((l,i)=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;background:#15171f;border:1px solid var(--border);border-radius:10px;padding:10px 12px"><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">${esc(l.label||l.type)}</div><div style="font-size:11px;color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.url)}</div></div><button onclick="window._rmBrLink(${i})" style="background:rgba(255,68,85,.08);border:1px solid rgba(255,68,85,.2);border-radius:7px;padding:4px 8px;font-size:11px;font-weight:700;color:var(--red);cursor:pointer;font-family:'Nunito',sans-serif">✕</button></div>`).join(''):`<div style="font-size:12px;color:var(--gray);margin-bottom:8px">No links yet.</div>`;
   }
   renderLinks();
-  window._pickPhoto=function(){const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{photoData=ev.target.result;const a=$('br-av');if(a)a.innerHTML=`<img src="${ev.target.result}" style="width:64px;height:64px;border-radius:50%;object-fit:cover"/>`;};r.readAsDataURL(f);};i.click();};
+
+  window._pickPhoto=function(){const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=e=>{const f=e.target.files[0];if(!f)return;if(f.size>10*1024*1024){showToast('Image too large (max 10MB)');return;}const r=new FileReader();r.onload=ev=>{const img=new Image();img.onload=function(){const MAX=200;let w=img.width,h=img.height;if(w>h){if(w>MAX){h=Math.round(h*(MAX/w));w=MAX;}}else{if(h>MAX){w=Math.round(w*(MAX/h));h=MAX;}}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);const compressed=c.toDataURL('image/jpeg',0.85);photoData=compressed;const a=$('br-av');if(a)a.innerHTML=`<img src="${compressed}" style="width:64px;height:64px;border-radius:50%;object-fit:cover"/>`;};img.src=ev.target.result;};r.readAsDataURL(f);};i.click();};
   window._rmBrLink=function(i){links.splice(i,1);renderLinks();};
   window._addBrLink=function(){
     const type=($('br-ltype')||{}).value||'custom';
@@ -1316,15 +1319,22 @@ function renderSettingsTab(body) {
       };
     };
 
-    // Logo upload
+    // Logo upload — compressed via canvas to stay within Firestore 1MB limit
     window._pickLogo=function(){
       const i=document.createElement('input');i.type='file';i.accept='image/*';
-      i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
-        r.onload=ev=>{window._logoData=ev.target.result;const li=$('s-logo');if(li)li.value='';
+      i.onchange=e=>{const f=e.target.files[0];if(!f)return;if(f.size>10*1024*1024){showToast('Image too large (max 10MB)');return;}
+        const r=new FileReader();r.onload=ev=>{const img=new Image();img.onload=function(){
+          const MAX_H=300,MAX_W=600;let w=img.width,h=img.height;
+          if(h>MAX_H){w=Math.round(w*(MAX_H/h));h=MAX_H;}
+          if(w>MAX_W){h=Math.round(h*(MAX_W/w));w=MAX_W;}
+          const c=document.createElement('canvas');c.width=w;c.height=h;
+          c.getContext('2d').drawImage(img,0,0,w,h);
+          const compressed=c.toDataURL('image/jpeg',0.85);
+          window._logoData=compressed;const li=$('s-logo');if(li)li.value='';
           let p=$('s-logo-prev');if(!p){p=document.createElement('img');p.id='s-logo-prev';
             p.style='height:48px;object-fit:contain;border-radius:8px;margin-bottom:10px;display:block';
-            $('s-logo').parentNode.insertAdjacentElement('afterend',p);}p.src=ev.target.result;};
-        r.readAsDataURL(f);};i.click();};
+            $('s-logo').parentNode.insertAdjacentElement('afterend',p);}p.src=compressed;};
+        img.src=ev.target.result;};r.readAsDataURL(f);};i.click();};
   }
 
   window._saveBranding = async function(){
